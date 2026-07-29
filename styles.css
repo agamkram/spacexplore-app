@@ -1,0 +1,1437 @@
+:root {
+  --bg: #04060a;
+  --bg2: #0a1018;
+  --cell: rgba(16, 22, 32, 0.92);
+  --cell-hi: rgba(24, 32, 44, 0.96);
+  --line: #2a3548;
+  --text: #e6ebf2;
+  --dim: #6a8fad;
+  --faint: #4a6880;
+  --ok: #3dce8a;
+  --hold: #f5a623;
+  --hot: #e85555;
+  --accent: #9eabb8;
+  --on-x: #c9a88a;
+  --font: "DM Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  width: 100%;
+  min-height: 100%;
+  min-height: -webkit-fill-available;
+  overflow: hidden;
+  overflow-x: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12px;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+
+/*
+ * PWA Bug B: layout viewport shorter than screen → black strip under board.
+ * Lock html/body/stage to screen fill (SuperMoon path). Safari tabs skip this.
+ */
+html.pwa-standalone,
+html.pwa-standalone body {
+  height: calc(var(--pwa-fill-h, 100%) + var(--pwa-extra-b, 0px));
+  min-height: calc(var(--pwa-fill-h, 100%) + var(--pwa-extra-b, 0px));
+}
+
+html.pwa-standalone .fit-stage {
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: auto;
+  width: 100%;
+  height: calc(var(--pwa-fill-h, 100%) + var(--pwa-extra-b, 0px));
+}
+
+.fit-stage {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: 100vw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse 90% 55% at 50% -8%, rgba(90, 140, 200, 0.14), transparent 58%),
+    radial-gradient(ellipse 70% 45% at 100% 100%, rgba(232, 140, 70, 0.06), transparent 50%),
+    radial-gradient(ellipse 50% 40% at 0% 80%, rgba(60, 100, 160, 0.07), transparent 45%),
+    linear-gradient(180deg, #03050a 0%, #060a12 50%, #04060a 100%);
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Canvas starfield — full stage, including former strip zone */
+.starfield {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.fit-stage > .app {
+  position: relative;
+  z-index: 1;
+}
+
+.app {
+  width: 390px;
+  max-width: 100%;
+  height: 844px;
+  display: grid;
+  grid-template-rows:
+    auto   /* title */
+    auto   /* picker */
+    auto   /* next + pad weather */
+    auto   /* scale */
+    minmax(0, 1.35fr) /* specs */
+    minmax(0, 0.825fr) /* ops */
+    auto   /* by vehicle */
+    minmax(0, 0.9fr) /* media */;
+  gap: 3px;
+  padding: 4px 6px max(8px, env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  flex-shrink: 0;
+  transform-origin: center center;
+  overflow: hidden;
+  min-width: 0;
+  position: relative; /* full map overlay */
+}
+
+/* Was visibility:hidden until fit — any JS error = permanent black screen.
+   Keep content visible; fit only scales/sizes. */
+.app:not(.is-fitted) {
+  opacity: 1;
+}
+
+/* —— Header —— */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(0.28in + 15px);
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.app-title {
+  margin: 0;
+  font-family: "Michroma", "DM Sans", system-ui, sans-serif;
+  font-weight: 400;
+  font-size: clamp(20.8px, 3.2vmin, 25.6px);
+  letter-spacing: 0.1em;
+  line-height: 1.15;
+  color: var(--text);
+  text-align: center;
+}
+
+/* —— Picker —— */
+.picker {
+  display: flex;
+  gap: 3px;
+  flex-shrink: 0;
+  min-width: 0;
+  width: 100%;
+}
+
+.pick {
+  flex: 1 1 0;
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--cell);
+  color: var(--dim);
+  font-family: var(--font);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0;
+  padding: 7px 1px;
+  border-radius: 6px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.pick:hover { background: var(--cell-hi); color: var(--text); }
+
+.pick.is-active {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 12px rgba(197, 208, 224, 0.28);
+}
+
+/* —— Next instrument + mini map —— */
+.next-band {
+  position: relative;
+  background: var(--cell);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 7px;
+  overflow: hidden;
+  min-width: 0;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.next-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.next-left {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.next-labels {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: wrap;
+  margin-bottom: 1px;
+}
+
+.band-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.status-chip {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(61, 206, 138, 0.15);
+  color: var(--ok);
+  letter-spacing: 0.04em;
+}
+
+.status-chip.is-hold {
+  background: rgba(245, 166, 35, 0.15);
+  color: var(--hold);
+}
+
+.status-chip.is-go {
+  background: rgba(61, 206, 138, 0.15);
+  color: var(--ok);
+}
+
+.status-chip.is-tbc {
+  background: rgba(106, 143, 173, 0.18);
+  color: var(--dim);
+}
+
+.mission {
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mission-sub {
+  font-size: 10.5px;
+  color: var(--dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mission-meta {
+  font-size: 10px;
+  color: var(--faint);
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.countdown-wrap {
+  margin-top: 4px;
+  text-align: left;
+}
+
+.countdown {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.countdown-sub {
+  font-size: 9px;
+  color: var(--faint);
+  margin-top: 2px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Watch only when hard NET + link */
+.btn-watch {
+  flex-shrink: 0;
+  text-decoration: none;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(197, 208, 224, 0.14);
+  border: 1px solid rgba(197, 208, 224, 0.35);
+  color: var(--text);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.btn-watch.is-hidden,
+.btn-watch[hidden] {
+  display: none !important;
+}
+
+.btn-watch:active { opacity: 0.85; }
+
+.next-map {
+  position: relative;
+  width: 92px;
+  height: 92px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #04060a;
+  overflow: hidden;
+  cursor: pointer;
+  flex-shrink: 0;
+  align-self: center;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.mini-map-host {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none; /* whole square opens full map */
+}
+
+.map-chip {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  z-index: 2;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(230, 235, 242, 0.8);
+  background: rgba(4, 6, 10, 0.72);
+  padding: 1px 4px;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+.next-map:active {
+  border-color: var(--accent);
+}
+
+/* Leaflet — dark OSM basemap (accurate shore) + light white borders */
+.leaflet-container {
+  background: #04060a !important;
+  font-family: var(--font);
+  width: 100%;
+  height: 100%;
+}
+
+.leaflet-tile-pane {
+  display: block;
+  z-index: 200;
+}
+
+/* Keep dark dens look without crushing land into a black blob */
+.leaflet-tile-pane .sh-map-tiles,
+.leaflet-layer .sh-map-tiles {
+  filter: grayscale(0.35) contrast(1.08) brightness(1.02);
+}
+
+.leaflet-overlay-pane {
+  z-index: 400;
+}
+
+.leaflet-overlay-pane path {
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.leaflet-container .leaflet-marker-pane {
+  z-index: 600;
+}
+
+.leaflet-control-zoom a {
+  background: rgba(12, 16, 24, 0.92) !important;
+  color: var(--text) !important;
+  border-color: var(--line) !important;
+  width: 28px !important;
+  height: 28px !important;
+  line-height: 28px !important;
+}
+
+.leaflet-control-zoom {
+  border: 1px solid var(--line) !important;
+  border-radius: 6px !important;
+  overflow: hidden;
+}
+
+.leaflet-control-attribution {
+  background: rgba(4, 6, 10, 0.75) !important;
+  color: var(--faint) !important;
+  font-size: 8px !important;
+}
+
+.leaflet-control-attribution a {
+  color: var(--dim) !important;
+}
+
+.sh-pin {
+  background: transparent !important;
+  border: none !important;
+}
+
+.sh-pin-dot {
+  display: block;
+  border-radius: 50%;
+}
+
+.sh-tip {
+  background: rgba(12, 16, 24, 0.95) !important;
+  border: 1px solid var(--line) !important;
+  color: var(--text) !important;
+  font-family: var(--font) !important;
+  font-size: 10px !important;
+  padding: 3px 7px !important;
+  box-shadow: none !important;
+  border-radius: 4px !important;
+}
+
+.sh-tip::before {
+  border-top-color: var(--line) !important;
+}
+
+/* Full map overlay — never a grid row; covers desk only when open */
+.map-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: none;
+  flex-direction: column;
+  background: var(--bg);
+  min-width: 0;
+  min-height: 0;
+}
+
+.map-overlay.is-open {
+  display: flex;
+}
+
+.map-overlay[hidden] {
+  display: none !important;
+}
+
+.map-overlay-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(10, 14, 20, 0.92);
+  flex-shrink: 0;
+}
+
+.map-overlay-title {
+  font-family: "Michroma", var(--font), sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.map-overlay-sub {
+  flex: 1;
+  min-width: 0;
+  font-size: 9px;
+  color: var(--dim);
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-overlay-close {
+  border: 1px solid var(--line);
+  background: var(--cell);
+  color: var(--text);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.map-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.full-map {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  background: #04060a;
+  position: relative;
+  z-index: 0;
+}
+
+/* Leaflet pin hit targets */
+.leaflet-div-icon.sh-pin {
+  background: transparent !important;
+  border: none !important;
+}
+
+.sh-pin-hit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: -4px 0 0 -4px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.leaflet-marker-icon,
+.leaflet-marker-pane {
+  pointer-events: auto !important;
+}
+
+.leaflet-popup-content-wrapper {
+  background: rgba(10, 14, 22, 0.96);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.leaflet-popup-content {
+  margin: 10px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  min-width: 180px;
+  max-width: 280px;
+}
+
+.leaflet-popup-tip {
+  background: rgba(10, 14, 22, 0.96);
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+  color: var(--dim);
+}
+
+.sh-pop-inner .sh-pop-kind {
+  margin-top: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-family: var(--mono);
+}
+
+.sh-pop-inner .sh-pop-blurb {
+  margin: 8px 0 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--dim);
+}
+
+.sh-maps-btn {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--cell);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-align: center;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.sh-maps-btn:hover,
+.sh-maps-btn:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+  outline: none;
+}
+
+.sh-maps-btn:active {
+  opacity: 0.88;
+}
+
+.map-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 10px;
+  border-top: 1px solid var(--line);
+  font-size: 9px;
+  color: var(--dim);
+  flex-shrink: 0;
+  padding-bottom: max(5px, env(safe-area-inset-bottom, 0px));
+  background: rgba(4, 6, 10, 0.96);
+  z-index: 2;
+}
+
+.map-attrib {
+  margin-left: auto;
+  font-size: 8px;
+  color: var(--faint);
+  font-family: var(--mono);
+}
+
+.leg::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
+.leg-next::before {
+  background: var(--next-pin, var(--accent));
+  box-shadow: 0 0 6px var(--next-pin, var(--accent));
+}
+
+.leg-site::before {
+  background: #d0d6e0;
+}
+
+/* —— Scale / C —— */
+.scale-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  background: var(--cell);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 9px;
+  min-width: 0;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.scale-main { min-width: 0; overflow: hidden; }
+
+.scale-k {
+  font-size: 9px;
+  color: var(--faint);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scale-row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.scale-pct {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.scale-frac {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.scale-bar-wrap {
+  height: 6px;
+  background: #0a0e14;
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  min-width: 0;
+}
+
+.scale-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #6a7a8c, var(--accent));
+  border-radius: 3px;
+  transition: width 0.35s ease;
+}
+
+.scale-side {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  border-left: 1px solid var(--line);
+  padding-left: 8px;
+  min-width: 68px;
+  flex-shrink: 0;
+}
+
+.mini-stat {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 10px;
+  min-width: 0;
+}
+
+.mini-stat .k { color: var(--faint); }
+.mini-stat .v {
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* —— Specs (dense) —— */
+.specs-band {
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.band-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.band-hint {
+  font-size: 8px;
+  color: var(--faint);
+  letter-spacing: 0.04em;
+}
+
+.specs-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  overflow: hidden;
+}
+
+/* —— Spec cells (Profile / Vehicle / …) — exactly 3 lines, shared rules —— */
+.spec-cell {
+  border: 1px solid var(--line);
+  background: var(--cell);
+  border-radius: 5px;
+  /* Sides 2px. Top 1px. Bottom 2px — clears sub descenders (g, p). */
+  padding: 1px 2px 2px;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  /* Pack header to top edge, sub to bottom — leftover height splits as tiny interline */
+  justify-content: space-between;
+  align-items: stretch;
+  gap: 0;
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+}
+
+.spec-cell:hover,
+.spec-cell:focus-visible {
+  background: var(--cell-hi);
+  border-color: var(--accent);
+  outline: none;
+}
+
+.spec-cell .k,
+.spec-cell .v,
+.spec-cell .s {
+  display: block;
+  flex: 0 0 auto;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+  /* >1 so descenders (g, p, y) clear under overflow:hidden */
+  line-height: 1.2;
+}
+
+.spec-cell .k {
+  font-size: 10px;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.spec-cell .v {
+  font-family: var(--mono);
+  font-size: 18.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.spec-cell .s {
+  font-size: 11px;
+  color: var(--dim);
+  line-height: 1.25;
+  margin-top: 1px;
+}
+
+/* Hide type until sync fit sets inline sizes — kills huge→small flash */
+.specs-grid:not(.is-typefit) .spec-cell .k,
+.specs-grid:not(.is-typefit) .spec-cell .v,
+.specs-grid:not(.is-typefit) .spec-cell .s {
+  opacity: 0;
+}
+
+/* —— Pad weather + POV (nested under next flight) —— */
+.weather-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.weather-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+  min-width: 0;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 5px;
+}
+
+.w-cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 2px;
+}
+
+.w-cell .k {
+  font-size: 7.5px;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.1;
+}
+
+.w-cell .v {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.15;
+}
+
+/* Pad label uses full “LC-39A at Kennedy…” form — allow slightly smaller type */
+.w-cell:first-child .v {
+  font-size: 9px;
+  letter-spacing: -0.01em;
+}
+
+/* Range POV — sibling button, not another pad metric */
+.pov-btn {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  min-width: 64px;
+  max-width: 80px;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.22);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  -webkit-appearance: none;
+  appearance: none;
+  overflow: hidden;
+}
+
+.countdown-sub[hidden],
+.countdown-sub:empty {
+  display: none !important;
+}
+
+.pov-btn:hover,
+.pov-btn:focus-visible {
+  border-color: var(--accent);
+  background: var(--cell-hi);
+  outline: none;
+}
+
+.pov-btn .k {
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+  line-height: 1.05;
+}
+
+.pov-btn .v {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.05;
+  color: var(--accent);
+  margin-top: 0;
+}
+
+.pov-btn.is-go .v { color: var(--ok); }
+.pov-btn.is-watch .v { color: var(--hold); }
+.pov-btn.is-nogo .v { color: var(--hot); }
+
+/* —— Ops tiles —— */
+.context-band {
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow: hidden;
+  width: 100%;
+  /* Keep ops from painting into Breakdown below */
+  isolation: isolate;
+  z-index: 0;
+  padding-bottom: 1px;
+}
+
+.context-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  overflow: hidden;
+}
+
+/* —— Ops tiles — same edge rhythm as specs (1 / 2 / 2 / 2) —— */
+.tile {
+  border: 1px solid var(--line);
+  background: var(--cell);
+  border-radius: 7px;
+  padding: 1px 2px 2px;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: stretch;
+  gap: 0;
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.tile:hover,
+.tile:focus-visible {
+  background: var(--cell-hi);
+  border-color: var(--accent);
+  outline: none;
+}
+
+.tile .k,
+.tile .v,
+.tile .s {
+  display: block;
+  flex: 0 0 auto;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+  line-height: 1;
+}
+
+.tile .k {
+  font-size: 8.25px;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tile .v {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tile .s {
+  font-size: 9px;
+  color: var(--dim);
+  line-height: 1.2;
+  margin-top: 1px;
+}
+
+/* —— Mix breakdown —— */
+.mix-band {
+  background: var(--cell);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  /* Donate height to Ops / On X — keep Breakdown compact */
+  padding: 2px 5px 3px;
+  flex-shrink: 0;
+  min-width: 0;
+  overflow: hidden;
+  margin-top: 1px;
+  isolation: isolate;
+  z-index: 1;
+  position: relative;
+}
+
+.mix-band > .band-label {
+  display: block;
+  margin-bottom: 0;
+  line-height: 1.1;
+  font-size: 8.5px;
+}
+
+.mix-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 1px;
+  min-width: 0;
+}
+
+.mix-cell .v {
+  font-size: 12px;
+  line-height: 1.1;
+}
+
+.mix-cell {
+  text-align: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.mix-cell .k {
+  font-size: 8px;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mix-cell .v {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* —— Media / X —— */
+.media-band {
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.media-rail {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* Same band height as before; 3 rows → shorter cells */
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  overflow: hidden;
+}
+
+/* —— On X cards — name only, centered in cell —— */
+.media-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  gap: 0;
+  padding: 1px 2px 2px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--cell);
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.media-card:hover {
+  background: var(--cell-hi);
+  border-color: var(--on-x);
+}
+
+.media-card .title {
+  display: block;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+  font-size: 9.5px;
+  font-weight: 600;
+  /* 1.25 clears descenders (g, p, y) — 1.1 was clipping TheSpaceEngineer */
+  line-height: 1.25;
+  color: var(--on-x);
+  text-align: center;
+}
+
+/* —— Footer —— */
+.app-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 8px;
+  color: var(--faint);
+  padding: 1px 2px 0;
+  flex-shrink: 0;
+  min-width: 0;
+  /* Content clears home indicator; stage height stays = VV only */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.app-foot #disclaimer {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.about-btn {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--dim);
+  font: inherit;
+  font-size: 9px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* —— Sheets —— */
+.sheet {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #0c1018;
+  color: var(--text);
+  padding: 0;
+  max-width: min(360px, 92vw);
+  width: 92vw;
+}
+
+.sheet::backdrop {
+  background: rgba(0, 0, 0, 0.62);
+}
+
+.sheet-inner {
+  padding: 16px 16px 14px;
+}
+
+.sheet-inner h2 {
+  font-family: "Michroma", var(--font), sans-serif;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  font-weight: 400;
+  margin-bottom: 10px;
+}
+
+.sheet-inner p {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--dim);
+  margin-bottom: 10px;
+}
+
+.about-meta {
+  font-size: 10px !important;
+  color: var(--faint) !important;
+  font-family: var(--mono);
+}
+
+.sheet-close {
+  margin-top: 4px;
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--cell);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  padding: 9px;
+  border-radius: 7px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* —— Phone: fluid full-bleed, VV-pinned stage —— */
+@media (max-width: 500px), ((max-height: 500px) and (pointer: coarse)) {
+  .fit-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    width: 100%;
+    max-width: 100vw;
+    /* Side + top air only — NOT bottom safe-area (VV owns height) */
+    padding:
+      max(0.04in, env(safe-area-inset-top, 0px))
+      max(0.05in, env(safe-area-inset-right, 0px))
+      0
+      max(0.05in, env(safe-area-inset-left, 0px));
+  }
+
+  .fit-stage.fit-stage--vv {
+    /* Stage already = visualViewport; no extra top env (double-count hop) */
+    padding-top: 0.03in;
+    padding-left: max(0.05in, env(safe-area-inset-left, 0px));
+    padding-right: max(0.05in, env(safe-area-inset-right, 0px));
+    padding-bottom: 0;
+  }
+
+  .fit-stage.fit-stage--standalone.fit-stage--vv {
+    padding-top: max(0.06in, env(safe-area-inset-top, 0px));
+    padding-bottom: 0;
+  }
+
+  /* PWA: stage already = screen fill; pad top only for status bar */
+  html.pwa-standalone .fit-stage,
+  .fit-stage.fit-stage--standalone {
+    padding-top: max(0.06in, env(safe-area-inset-top, 0px));
+    padding-left: max(0.05in, env(safe-area-inset-left, 0px));
+    padding-right: max(0.05in, env(safe-area-inset-right, 0px));
+    padding-bottom: 0;
+  }
+
+  .fit-stage.fit-stage--fluid {
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .app {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 1 0;
+    align-self: stretch;
+    min-width: 0;
+    min-height: 0;
+    max-height: none;
+    height: 100% !important;
+    transform: none !important;
+    zoom: normal;
+    padding: 2px 3px 2px;
+    gap: 2px;
+    overflow: hidden;
+  }
+
+  .pick {
+    font-size: 8px;
+    padding: 6px 0;
+  }
+
+  .mission { font-size: 12.5px; }
+  .countdown { font-size: 20px; }
+  .scale-pct { font-size: 17px; }
+  .next-map { width: 84px; height: 84px; }
+  .next-band { padding: 5px 6px; }
+  .scale-band { padding: 5px 7px; }
+  .mix-band {
+    padding: 1px 4px 2px;
+    margin-top: 1px;
+  }
+  .mix-band > .band-label {
+    margin-bottom: 0;
+    font-size: 8px;
+  }
+  .mix-cell .v { font-size: 11px; }
+  /* Keep lowest On X corners on-screen (PWA home indicator) */
+  .app {
+    padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+/*
+ * iPhone Safari tab only (not Home Screen PWA): shorter viewport → fr rows shrink.
+ * Tighter cell padding first so Enterprise / On X text stays inside borders.
+ */
+@media (max-width: 500px) and (display-mode: browser) {
+  .spec-cell,
+  .tile,
+  .media-card {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
+}
+
+@media (max-height: 420px) and (orientation: landscape) {
+  .next-band .weather-row,
+  .mix-band { display: none; }
+  .context-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .context-grid .tile:nth-child(n + 4) { display: none; }
+  .media-rail {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .specs-grid {
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+  .specs-grid .spec-cell:nth-child(n + 9) { display: none; }
+}
+
+@media (min-width: 768px) {
+  .app {
+    width: 400px;
+    height: 860px;
+  }
+
+  /* ~+20% dens again — iPad / wide; phone unchanged */
+  .spec-cell .k { font-size: 14.4px; }
+  .spec-cell .v { font-size: 26.6px; }
+  .spec-cell .s { font-size: 15.8px; }
+
+  .tile .k { font-size: 11.9px; }
+  .tile .v { font-size: 16.6px; }
+  .tile .s { font-size: 13px; }
+
+  .media-card .title { font-size: 13.7px; }
+}

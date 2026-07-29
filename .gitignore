@@ -1,0 +1,12 @@
+# Local HTTPS (never publish)
+.local-key.pem
+.local-cert.pem
+*.pem
+
+# Tooling / OS
+.DS_Store
+node_modules/
+.vercel
+.env
+.env.*
+.tmp-gh/

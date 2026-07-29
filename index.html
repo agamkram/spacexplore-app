@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en" style="background-color:#04060a">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#04060a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="SpaceXplore" />
+  <meta name="description" content="SpaceXplore — launches, programs, sites, cadence." />
+  <title>SpaceXplore</title>
+  <script>
+    /* iOS A2HS Bug B — lock fill height before first paint (see Desktop Bottom:full bleed.txt).
+       Phone: screen often taller than innerHeight → black strip under layout.
+       iPad: screen metrics can undershoot → extra bottom. */
+    (function () {
+      var n = window.navigator;
+      var standalone =
+        n.standalone === true ||
+        window.matchMedia("(display-mode: standalone)").matches ||
+        window.matchMedia("(display-mode: fullscreen)").matches;
+      if (!standalone) return;
+      var root = document.documentElement;
+      root.classList.add("pwa-standalone");
+      var iw = window.innerWidth || 0;
+      var ih = window.innerHeight || 0;
+      var sw = window.screen.width || 0;
+      var sh = window.screen.height || 0;
+      var screenMax = Math.max(sw, sh);
+      var screenMin = Math.min(sw, sh);
+      var fillH = ih >= iw ? Math.max(ih, screenMax) : Math.max(ih, screenMin);
+      var extra = 0;
+      if (Math.min(iw, ih) >= 600 && screenMax < ih - 10) {
+        extra = 20;
+      }
+      root.style.setProperty("--pwa-fill-h", fillH + "px");
+      root.style.setProperty("--pwa-extra-b", extra + "px");
+    })();
+  </script>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="apple-touch-icon.png" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=IBM+Plex+Mono:wght@500;600&family=Michroma&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="stylesheet" href="styles.css?v=154" />
+</head>
+<body>
+  <div class="fit-stage" id="fit-stage">
+    <canvas id="starfield" class="starfield" aria-hidden="true"></canvas>
+    <div class="app" id="app">
+      <header class="app-header">
+        <h1 class="app-title">SpaceXplore</h1>
+      </header>
+
+      <nav class="picker" id="picker" aria-label="Program">
+        <!-- filled by app.js -->
+      </nav>
+
+      <section class="next-band" aria-label="Next flight and pad weather">
+        <div class="next-grid">
+          <div class="next-left">
+            <div class="next-labels">
+              <span class="band-label">Next flight</span>
+              <span class="status-chip" id="status-chip">—</span>
+              <a class="btn-watch is-hidden" id="btn-watch" href="#" target="_blank" rel="noopener noreferrer" hidden>Watch</a>
+            </div>
+            <div class="mission" id="mission-name">—</div>
+            <div class="mission-sub" id="mission-sub">—</div>
+            <div class="mission-meta" id="mission-meta">—</div>
+            <div class="countdown-wrap">
+              <div class="countdown" id="countdown">—</div>
+              <div class="countdown-sub" id="countdown-sub" hidden></div>
+            </div>
+          </div>
+          <div
+            class="next-map"
+            id="next-map-btn"
+            role="button"
+            tabindex="0"
+            aria-label="Open site map"
+          >
+            <div id="mini-map" class="mini-map-host" aria-hidden="true"></div>
+            <span class="map-chip">Map</span>
+          </div>
+        </div>
+        <div class="weather-row" aria-label="Pad weather and range POV">
+          <div class="weather-grid" id="weather-grid">
+            <div class="w-cell"><span class="k">Pad</span><span class="v" id="w-pad">—</span></div>
+            <div class="w-cell"><span class="k">Wind</span><span class="v" id="w-wind">—</span></div>
+            <div class="w-cell"><span class="k">Cloud</span><span class="v" id="w-cloud">—</span></div>
+            <div class="w-cell"><span class="k">Precip</span><span class="v" id="w-precip">—</span></div>
+          </div>
+          <button type="button" class="pov-btn" id="pov-btn" aria-label="Range probability of violation">
+            <span class="k">POV</span>
+            <span class="v" id="pov-val">—</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="scale-band" aria-label="Year pace">
+        <div class="scale-main">
+          <div class="scale-k">Year pace · public target</div>
+          <div class="scale-row">
+            <div class="scale-pct" id="scale-pct">—</div>
+            <div class="scale-frac" id="scale-frac">—</div>
+            <div class="scale-bar-wrap">
+              <div class="scale-bar" id="scale-bar"></div>
+            </div>
+          </div>
+        </div>
+        <div class="scale-side">
+          <div class="mini-stat">
+            <span class="k">Streak</span>
+            <span class="v" id="stat-streak">—</span>
+          </div>
+          <div class="mini-stat">
+            <span class="k">Land YTD</span>
+            <span class="v" id="stat-land">—</span>
+          </div>
+          <div class="mini-stat">
+            <span class="k">Success</span>
+            <span class="v" id="stat-success">—</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="specs-band" aria-label="Specifications">
+        <div class="band-head">
+          <span class="band-label" id="specs-title">Specs</span>
+          <span class="band-hint">tap for detail</span>
+        </div>
+        <div class="specs-grid" id="specs-grid"></div>
+      </section>
+
+      <section class="context-band" aria-label="Program context">
+        <div class="band-head">
+          <span class="band-label">Ops</span>
+          <span class="band-hint">tap tile</span>
+        </div>
+        <div class="context-grid" id="context-grid"></div>
+      </section>
+
+      <section class="mix-band" aria-label="By vehicle">
+        <span class="band-label">By vehicle</span>
+        <div class="mix-grid" id="mix-grid"></div>
+      </section>
+
+      <section class="media-band" aria-label="On X">
+        <div class="band-head">
+          <span class="band-label">On X</span>
+          <span class="band-hint">opens X</span>
+        </div>
+        <div class="media-rail" id="media-rail"></div>
+      </section>
+
+      <!-- Overlay inside .app but out of dens flow; only shown when Map opens -->
+      <div class="map-overlay" id="map-overlay" hidden aria-hidden="true">
+        <div class="map-overlay-bar">
+          <span class="map-overlay-title">Sites</span>
+          <span class="map-overlay-sub" id="map-overlay-sub">Next highlighted</span>
+          <button type="button" class="map-overlay-close" id="map-overlay-close">Back</button>
+        </div>
+        <div class="map-stage">
+          <div id="full-map" class="full-map" role="application" aria-label="SpaceX sites map"></div>
+        </div>
+        <div class="map-legend">
+          <span class="leg leg-next">Next</span>
+          <span class="leg leg-site">Other sites</span>
+          <span class="map-attrib" id="map-site-count">— sites</span>
+          <span class="map-attrib">© OSM · CARTO · NE</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <dialog class="sheet" id="sheet" aria-labelledby="sheet-title">
+    <div class="sheet-inner">
+      <h2 id="sheet-title">—</h2>
+      <p id="sheet-body">—</p>
+      <button type="button" class="sheet-close" id="sheet-close">Close</button>
+    </div>
+  </dialog>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="data.js?v=120"></script>
+  <script src="live.js?v=113"></script>
+  <script src="app.js?v=139"></script>
+</body>
+</html>

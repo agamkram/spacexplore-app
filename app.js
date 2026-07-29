@@ -352,8 +352,13 @@
     });
   }
 
-  /* Always on every program — display name only (band already says On X) */
+  /* Same 12 accounts on every program — SpaceX first */
   const ON_X_FIXED = [
+    {
+      handle: "@SpaceX",
+      title: "SpaceX",
+      url: "https://x.com/SpaceX",
+    },
     {
       handle: "@joetegtmeyer",
       title: "Joe Tegtmeyer",
@@ -412,20 +417,10 @@
     },
   ];
 
-  function renderMedia(items) {
+  function renderMedia() {
     if (el.mediaRail) el.mediaRail.classList.remove("is-typefit");
     el.mediaRail.innerHTML = "";
-    /* First slot: program/mission-specific (default SpaceX). Rest: fixed six. */
-    const mission =
-      items && items.length
-        ? items[0]
-        : {
-            handle: "@SpaceX",
-            title: "SpaceX",
-            url: "https://x.com/SpaceX",
-          };
-    const list = [mission].concat(ON_X_FIXED);
-    list.forEach((m) => {
+    ON_X_FIXED.forEach((m) => {
       const a = document.createElement("a");
       a.className = "media-card";
       a.href = m.url;
@@ -1387,7 +1382,7 @@
     renderWeather(p.weather || {});
     renderTiles(p.tiles);
     renderMix(p.stats);
-    renderMedia(p.media);
+    renderMedia();
     fitDenseLines();
     /* Debounced mini-map — don’t block chip switches */
     schedulePaintMaps();

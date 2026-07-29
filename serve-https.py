@@ -9,7 +9,7 @@ import ssl
 import sys
 
 ROOT = Path(__file__).resolve().parent
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8843
+DEFAULT_PORT = 8843
 CERT = ROOT / ".local-cert.pem"
 KEY = ROOT / ".local-key.pem"
 
@@ -140,32 +140,96 @@ class Handler(SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(body)
             return
+        # Explicit PNG touch-icon responses — iOS is picky about probes
+        if path.startswith("/apple-touch-icon") or path in (
+            "/icon-192.png",
+            "/icon-512.png",
+        ):
+            rel = path.lstrip("/")
+            fp = ROOT / rel
+            if fp.is_file():
+                data = fp.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Cache-Control", "public, max-age=86400")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+                return
         return super().do_GET()
 
     def end_headers(self):
-        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        path = (self.path or "").split("?", 1)[0].lower()
+        # iOS A2HS needs a cacheable apple-touch-icon — no-store → letter glyph
+        if path.endswith(
+            (
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".webp",
+                ".ico",
+                ".webmanifest",
+            )
+        ) or path.endswith("manifest.webmanifest"):
+            self.send_header("Cache-Control", "public, max-age=86400")
+        else:
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
         super().end_headers()
 
     def log_message(self, fmt, *args):
         sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
 
 
+def _lan_ips():
+    ips = []
+    try:
+        import socket
+
+        hostname = socket.gethostname()
+        for info in socket.getaddrinfo(hostname, None, socket.AF_INET):
+            ip = info[4][0]
+            if ip and not ip.startswith("127.") and ip not in ips:
+                ips.append(ip)
+    except Exception:
+        pass
+    return ips
+
+
 def main():
-    if not CERT.exists() or not KEY.exists():
-        print("Missing .local-cert.pem / .local-key.pem", file=sys.stderr)
-        sys.exit(1)
+    mode = "https"
+    argv = [a for a in sys.argv[1:] if a]
+    port = DEFAULT_PORT
+    if argv and argv[0] in ("--http", "http"):
+        mode = "http"
+        argv = argv[1:]
+    if argv:
+        port = int(argv[0])
 
-    httpd = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
-    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    ctx.load_cert_chain(certfile=str(CERT), keyfile=str(KEY))
-    httpd.socket = ctx.wrap_socket(httpd.socket, server_side=True)
+    httpd = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+    lan = _lan_ips()
+    lan_hint = lan[0] if lan else "<this-mac-ip>"
 
-    print("SpaceXplore HTTPS")
-    print(f"  Local:  https://127.0.0.1:{PORT}/")
-    print(f"  LAN:    https://<this-mac-ip>:{PORT}/")
-    print(f"  Quote:  https://127.0.0.1:{PORT}/api/spcx")
+    if mode == "https":
+        if not CERT.exists() or not KEY.exists():
+            print("Missing .local-cert.pem / .local-key.pem", file=sys.stderr)
+            sys.exit(1)
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ctx.load_cert_chain(certfile=str(CERT), keyfile=str(KEY))
+        httpd.socket = ctx.wrap_socket(httpd.socket, server_side=True)
+        print("SpaceXplore HTTPS")
+        print(f"  Local:  https://127.0.0.1:{port}/")
+        print(f"  LAN:    https://{lan_hint}:{port}/")
+        print("  Self-signed: iOS often still uses letter 'S' for A2HS.")
+        print("  For a real home-screen icon locally, use HTTP mode instead:")
+        print(f"    python3 serve-https.py --http {port + 1}")
+    else:
+        print("SpaceXplore HTTP (use this for Add to Home Screen icon test)")
+        print(f"  Local:  http://127.0.0.1:{port}/")
+        print(f"  LAN:    http://{lan_hint}:{port}/")
+        print("  Open this URL on the phone, wait for the page, then Share → Add to Home Screen.")
+
+    print(f"  Quote:  /api/spcx")
     print(f"  Dir:    {ROOT}")
-    print("  Accept the self-signed cert warning on each device once.")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

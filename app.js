@@ -318,6 +318,7 @@
   }
 
   function renderTiles(tiles) {
+    if (el.contextGrid) el.contextGrid.classList.remove("is-typefit");
     el.contextGrid.innerHTML = "";
     (tiles || []).forEach((t) => {
       const btn = document.createElement("button");
@@ -354,14 +355,14 @@
   /* Always on every program — display name only (band already says On X) */
   const ON_X_FIXED = [
     {
-      handle: "@AJamesMcCarthy",
-      title: "Andrew McCarthy",
-      url: "https://x.com/AJamesMcCarthy",
-    },
-    {
       handle: "@joetegtmeyer",
       title: "Joe Tegtmeyer",
       url: "https://x.com/joetegtmeyer",
+    },
+    {
+      handle: "@AJamesMcCarthy",
+      title: "Andrew McCarthy",
+      url: "https://x.com/AJamesMcCarthy",
     },
     {
       handle: "@Erdayastronaut",
@@ -412,6 +413,7 @@
   ];
 
   function renderMedia(items) {
+    if (el.mediaRail) el.mediaRail.classList.remove("is-typefit");
     el.mediaRail.innerHTML = "";
     /* First slot: program/mission-specific (default SpaceX). Rest: fixed six. */
     const mission =
@@ -443,7 +445,7 @@
     return (
       !!node &&
       node.clientWidth >= 2 &&
-      node.scrollWidth > node.clientWidth + 0.5
+      node.scrollWidth > node.clientWidth + 0.25
     );
   }
 
@@ -461,12 +463,14 @@
     return window.matchMedia("(min-width: 768px)").matches;
   }
 
-  /** Phone dens vs ~20% larger tablet dens */
+  /** Phone dens vs tablet dens. Artboard is still ~390px wide on Mac/iPad —
+   *  max stays bumped for short labels; min must drop to phone-like floors
+   *  so long subs ("3 under construction", "working on orbit") can fit. */
   function specLimits() {
     if (densTablet()) {
       return {
         max: { k: 14.4, v: 30, s: 16.8 },
-        min: { k: 10.1, v: 14.4, s: 11.5 },
+        min: { k: 7, v: 10, s: 7.5 },
       };
     }
     return {
@@ -478,9 +482,9 @@
   function opsFitLimits() {
     if (densTablet()) {
       return {
-        k: [11.9, 7.9],
-        v: [16.6, 11.5],
-        s: [13.0, 7.9],
+        k: [11.9, 5.5],
+        v: [16.6, 8],
+        s: [13.0, 5.5],
       };
     }
     return {
@@ -491,7 +495,7 @@
   }
 
   function onXFitLimits() {
-    return densTablet() ? [13.7, 9.4] : [9.5, 6.5];
+    return densTablet() ? [15.5, 7.5] : [9.5, 6.5];
   }
 
   function allSpecStrings(role) {
@@ -518,6 +522,22 @@
     specStringCache = null;
   }
 
+  /** Mac/iPad: don't flash type until webfonts measured. Phone: show when fitted. */
+  let densFontsReady =
+    typeof document === "undefined" ||
+    !document.fonts ||
+    document.fonts.status === "loaded";
+
+  function revealDensType() {
+    if (densTablet() && document.fonts && !densFontsReady) return;
+    if (el.specsGrid && el.specsGrid.children.length)
+      el.specsGrid.classList.add("is-typefit");
+    if (el.contextGrid && el.contextGrid.querySelector(".tile"))
+      el.contextGrid.classList.add("is-typefit");
+    if (el.mediaRail && el.mediaRail.querySelector(".media-card"))
+      el.mediaRail.classList.add("is-typefit");
+  }
+
   function applySpecType() {
     if (!el.specsGrid) return;
     el.specsGrid.querySelectorAll(".spec-cell").forEach((cell) => {
@@ -528,13 +548,12 @@
       if (v) v.style.fontSize = SPEC_SIZE.v + "px";
       if (s) s.style.fontSize = SPEC_SIZE.s + "px";
     });
-    el.specsGrid.classList.add("is-typefit");
+    revealDensType();
   }
 
-  function fitRoleToGlobalStrings(sampleNode, role, maxPx, minPx) {
+  function fitRoleToStrings(sampleNode, strings, maxPx, minPx) {
     if (!sampleNode || sampleNode.clientWidth < 2) return minPx;
-    const strings = allSpecStrings(role);
-    if (!strings.length) return maxPx;
+    if (!strings || !strings.length) return maxPx;
     const saved = sampleNode.textContent;
     let lo = minPx;
     let hi = maxPx;
@@ -560,10 +579,47 @@
     return Math.max(minPx, best);
   }
 
+  function fitRoleToGlobalStrings(sampleNode, role, maxPx, minPx) {
+    return fitRoleToStrings(sampleNode, allSpecStrings(role), maxPx, minPx);
+  }
+
+  /** Visible 12-cell strings (+ quote probes) — tablet sync without whole-app longest drag */
+  function gridSpecStrings(role, cells) {
+    const out = [];
+    (cells || []).forEach((cell) => {
+      const n = cell.querySelector("." + role);
+      const t = n && n.textContent;
+      if (t && String(t).trim()) out.push(String(t).trim());
+    });
+    if (role === "v") (SPEC_LIVE_PROBES.v || []).forEach((s) => out.push(s));
+    if (role === "s") (SPEC_LIVE_PROBES.s || []).forEach((s) => out.push(s));
+    return out;
+  }
+
+  /**
+   * iPad CSS zoom breaks scrollWidth/clientWidth — measure at zoom/transform none.
+   */
+  function withUnzoomedApp(fn) {
+    const appEl = el.app;
+    if (!appEl) return fn();
+    const z = appEl.style.zoom;
+    const tr = appEl.style.transform;
+    appEl.style.zoom = "";
+    appEl.style.transform = "";
+    void appEl.offsetWidth;
+    try {
+      return fn();
+    } finally {
+      appEl.style.zoom = z;
+      appEl.style.transform = tr;
+    }
+  }
+
   function lockSpecType(force) {
     if (!el.specsGrid) return;
     const cells = el.specsGrid.querySelectorAll(".spec-cell");
     if (!cells.length) return;
+
     const sample = cells[0];
     const sk = sample.querySelector(".k");
     const sv = sample.querySelector(".v");
@@ -574,6 +630,7 @@
     const tablet = densTablet();
     if (
       !force &&
+      !tablet &&
       specTypeReady &&
       Math.abs(w - specTypeWidth) < 1 &&
       tablet === specTypeTablet
@@ -583,9 +640,13 @@
     }
 
     const lim = specLimits();
-    SPEC_SIZE.k = fitRoleToGlobalStrings(sk, "k", lim.max.k, lim.min.k);
-    SPEC_SIZE.v = fitRoleToGlobalStrings(sv, "v", lim.max.v, lim.min.v);
-    SPEC_SIZE.s = fitRoleToGlobalStrings(ss, "s", lim.max.s, lim.min.s);
+    /* One size per role across all 12 boxes — never per-cell (looks chaotic) */
+    const kStr = tablet ? gridSpecStrings("k", cells) : allSpecStrings("k");
+    const vStr = tablet ? gridSpecStrings("v", cells) : allSpecStrings("v");
+    const sStr = tablet ? gridSpecStrings("s", cells) : allSpecStrings("s");
+    SPEC_SIZE.k = fitRoleToStrings(sk, kStr, lim.max.k, lim.min.k);
+    SPEC_SIZE.v = fitRoleToStrings(sv, vStr, lim.max.v, lim.min.v);
+    SPEC_SIZE.s = fitRoleToStrings(ss, sStr, lim.max.s, lim.min.s);
     specTypeReady = true;
     specTypeWidth = w;
     specTypeTablet = tablet;
@@ -615,21 +676,24 @@
   }
 
   function fitDenseLines(forceSpec) {
-    lockSpecType(!!forceSpec);
-    const ops = opsFitLimits();
-    const onX = onXFitLimits();
-    if (el.contextGrid) {
-      el.contextGrid.querySelectorAll(".tile").forEach((cell) => {
-        fitDenseLine(cell.querySelector(".k"), ops.k[0], ops.k[1]);
-        fitDenseLine(cell.querySelector(".v"), ops.v[0], ops.v[1]);
-        fitDenseLine(cell.querySelector(".s"), ops.s[0], ops.s[1]);
-      });
-    }
-    if (el.mediaRail) {
-      el.mediaRail.querySelectorAll(".media-card").forEach((cell) => {
-        fitDenseLine(cell.querySelector(".title"), onX[0], onX[1]);
-      });
-    }
+    withUnzoomedApp(function () {
+      lockSpecType(!!forceSpec);
+      const ops = opsFitLimits();
+      const onX = onXFitLimits();
+      if (el.contextGrid) {
+        el.contextGrid.querySelectorAll(".tile").forEach((cell) => {
+          fitDenseLine(cell.querySelector(".k"), ops.k[0], ops.k[1]);
+          fitDenseLine(cell.querySelector(".v"), ops.v[0], ops.v[1]);
+          fitDenseLine(cell.querySelector(".s"), ops.s[0], ops.s[1]);
+        });
+      }
+      if (el.mediaRail) {
+        el.mediaRail.querySelectorAll(".media-card").forEach((cell) => {
+          fitDenseLine(cell.querySelector(".title"), onX[0], onX[1]);
+        });
+      }
+      revealDensType();
+    });
   }
 
   function scheduleDenseFit() {
@@ -1678,6 +1742,16 @@
         ensureStarLoop();
       }
     });
+    /* DM Sans / Plex — wait, then fit once (avoids Mac big→small on font swap) */
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => {
+        densFontsReady = true;
+        invalidateSpecType();
+        fitDenseLines(true);
+      });
+    } else {
+      densFontsReady = true;
+    }
     setTimeout(() => {
       el.app.classList.add("is-fitted");
       scheduleFit();

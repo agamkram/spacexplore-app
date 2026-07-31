@@ -1,7 +1,7 @@
 {
   "name": "SpaceXplore",
   "short_name": "SpaceXplore",
-  "description": "SpaceXplore — launches, programs, sites, cadence.",
+  "description": "SpaceXplore \u2014 launches, programs, sites, cadence.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#04060a",
@@ -20,10 +20,19 @@
       "purpose": "any"
     },
     {
-      "src": "/apple-touch-icon-180x180.png",
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
       "sizes": "180x180",
       "type": "image/png",
       "purpose": "any"
     }
-  ]
+  ],
+  "scope": "/",
+  "id": "/",
+  "lang": "en"
 }

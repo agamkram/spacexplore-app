@@ -122,12 +122,12 @@
     const s = (launch.status && launch.status.name) || "";
     if (/Go for Launch/i.test(s)) return "Go";
     if (/Hold/i.test(s)) return "Hold";
+    if (/In Flight/i.test(s)) return "In flight";
+    if (/Partial/i.test(s)) return "Partial";
     if (/Success/i.test(s)) return "Success";
     if (/Fail/i.test(s)) return "Failure";
-    if (/In Flight/i.test(s)) return "In flight";
     if (/TBD|To Be Determined/i.test(s)) return "TBC";
     if (/TBC|To Be Confirmed/i.test(s)) return "TBC";
-    if (/Partial/i.test(s)) return "Partial";
     return s || "TBC";
   }
 
@@ -574,22 +574,39 @@
       "&limit=100&mode=detailed&ordering=-net";
     const qAgency = LL2 + "/agencies/" + LSP_SPACEX + "/";
 
-    return Promise.all([
-      fetchJson(qUpcoming),
-      fetchPagedResults(qPrevious),
-      fetchJson(qAgency),
-      loadStarlinkMarkets(),
-    ]).then(function (parts) {
-      cache = {
-        at: Date.now(),
-        upcoming: parts[0].results || [],
-        previous: parts[1] || [],
-        agency: parts[2] || null,
-        markets: parts[3] != null ? parts[3] : cache.markets,
-        marketsAt: cache.marketsAt || Date.now(),
-      };
-      return cache;
-    });
+    /*
+     * Upcoming is critical for Next flight. Do not let previous/agency/markets
+     * rate-limits (429) abort the whole refresh and leave July seed NETs stuck.
+     */
+    return fetchJson(qUpcoming)
+      .then(function (up) {
+        const upcoming = up.results || [];
+        return Promise.all([
+          Promise.resolve(upcoming),
+          fetchPagedResults(qPrevious).catch(function (err) {
+            console.warn("LL2 previous failed — keep prior cache", err);
+            return cache.previous || [];
+          }),
+          fetchJson(qAgency).catch(function (err) {
+            console.warn("LL2 agency failed — keep prior cache", err);
+            return cache.agency || null;
+          }),
+          loadStarlinkMarkets().catch(function () {
+            return cache.markets;
+          }),
+        ]);
+      })
+      .then(function (parts) {
+        cache = {
+          at: Date.now(),
+          upcoming: parts[0] || [],
+          previous: parts[1] || cache.previous || [],
+          agency: parts[2] != null ? parts[2] : cache.agency || null,
+          markets: parts[3] != null ? parts[3] : cache.markets,
+          marketsAt: cache.marketsAt || Date.now(),
+        };
+        return cache;
+      });
   }
 
   function applyLiveToData(base, live) {
@@ -622,6 +639,8 @@
 
       if (up.length) {
         prog.next = launchToNext(up[0]);
+        /* Second upcoming = “Next up” when first is still In flight / Success */
+        prog.nextUp = up.length > 1 ? launchToNext(up[1]) : null;
         /* Clear seed weather risk until enrichWeather fills */
         if (prog.weather) {
           prog.weather.risk = "—";
@@ -650,6 +669,7 @@
           padLat: null,
           padLon: null,
         };
+        prog.nextUp = null;
         if (prog.weather) {
           prog.weather.risk = "—";
           prog.weather.pov = null;

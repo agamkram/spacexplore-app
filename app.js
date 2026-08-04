@@ -50,10 +50,12 @@
 
   const el = {
     picker: document.getElementById("picker"),
+    flightBandLabel: document.getElementById("flight-band-label"),
     statusChip: document.getElementById("status-chip"),
     missionName: document.getElementById("mission-name"),
     missionSub: document.getElementById("mission-sub"),
     missionMeta: document.getElementById("mission-meta"),
+    nextUp: document.getElementById("next-up"),
     countdown: document.getElementById("countdown"),
     countdownSub: document.getElementById("countdown-sub"),
     btnWatch: document.getElementById("btn-watch"),
@@ -160,9 +162,91 @@
 
   function statusClass(status) {
     const s = (status || "").toLowerCase();
+    if (s.includes("in flight")) return "is-flight";
+    if (s.includes("success")) return "is-success";
+    if (s.includes("fail")) return "is-fail";
     if (s.includes("go") && !s.includes("no")) return "is-go";
     if (s.includes("hold")) return "is-hold";
     return "is-tbc";
+  }
+
+  /**
+   * next | inflight | last — when LL2 still lists a done/in-progress launch first.
+   * Success always wins over In flight (avoids flash when LL2 upgrades status).
+   */
+  function flightPhase(n) {
+    n = n || {};
+    const st = (n.status || "").toLowerCase();
+    const net = n.net ? new Date(n.net).getTime() : NaN;
+    const pastMs = Number.isFinite(net) ? Date.now() - net : 0;
+
+    /* Terminal outcomes → last (even if still first in LL2 upcoming) */
+    if (/success|fail|partial/.test(st)) return "last";
+
+    /* Active ascent only for a short window after NET */
+    if (/in\s*flight/.test(st)) {
+      if (pastMs > 3 * 3600 * 1000) return "last"; /* LL2 lag hours later */
+      return "inflight";
+    }
+
+    if (pastMs > 90 * 1000 && !/go|hold|tbc|tbd/.test(st)) return "last";
+    /* Stuck "Go" long after NET → treat as last until LL2 rolls next */
+    if (pastMs > 20 * 60 * 1000 && /go/.test(st)) return "last";
+    return "next";
+  }
+
+  function flightBandTitle(phase) {
+    if (phase === "inflight") return "In flight";
+    if (phase === "last") return "Last flight";
+    return "Next flight";
+  }
+
+  function shortCountdown(iso, precision) {
+    const c = countdownParts(iso, precision || "hour");
+    return c.main || "—";
+  }
+
+  function updateFlightBand(p) {
+    const n = (p && p.next) || {};
+    const phase = flightPhase(n);
+    const title = flightBandTitle(phase);
+    if (el.flightBandLabel) {
+      el.flightBandLabel.textContent = title;
+      el.flightBandLabel.classList.remove("is-next", "is-flight", "is-last");
+      el.flightBandLabel.classList.add(
+        phase === "inflight" ? "is-flight" : phase === "last" ? "is-last" : "is-next"
+      );
+    }
+    /* Don't echo the same words twice: "In flight" + chip "In flight" */
+    if (el.statusChip) {
+      const chip = (n.status || "").trim();
+      const chipNorm = chip.toLowerCase().replace(/\s+/g, "");
+      const titleNorm = title.toLowerCase().replace(/\s+/g, "");
+      const redundant =
+        !chip ||
+        chipNorm === titleNorm ||
+        (phase === "inflight" && /inflight/.test(chipNorm));
+      if (redundant && phase === "inflight") {
+        el.statusChip.hidden = true;
+        el.statusChip.setAttribute("hidden", "");
+      } else {
+        el.statusChip.hidden = false;
+        el.statusChip.removeAttribute("hidden");
+      }
+    }
+    if (el.nextUp) {
+      const up = p && p.nextUp;
+      if (up && up.name && (phase === "inflight" || phase === "last")) {
+        const t = shortCountdown(up.net, up.precision);
+        el.nextUp.hidden = false;
+        el.nextUp.removeAttribute("hidden");
+        el.nextUp.textContent = "Next up · " + up.name + " · " + t;
+      } else {
+        el.nextUp.hidden = true;
+        el.nextUp.setAttribute("hidden", "");
+        el.nextUp.textContent = "";
+      }
+    }
   }
 
   function renderScale(p) {
@@ -716,6 +800,8 @@
       if (sub) el.countdownSub.removeAttribute("hidden");
       else el.countdownSub.setAttribute("hidden", "");
     }
+    /* Title can flip Next → Last as NET passes; Next up T− ticks live */
+    updateFlightBand(p);
   }
 
   /** Vehicle line under mission name — drop redundant rocket / mission noise */
@@ -1364,6 +1450,8 @@
     el.missionSub.textContent = rocketLine(id, n.rocket, n.missionType);
     el.missionMeta.textContent = n.pad || "—";
 
+    /* Band title + chip visibility (after chip text is set) */
+    updateFlightBand(p);
     tickCountdown();
 
     /* Watch only when hard clock + link — not permanent chrome */

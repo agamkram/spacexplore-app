@@ -131,6 +131,12 @@
     return s || "TBC";
   }
 
+  /** LL2 keeps Success/Fail in /upcoming for a while — skip those for the desk next. */
+  function isTerminalLaunch(launch) {
+    const s = ((launch && launch.status && launch.status.name) || "").toLowerCase();
+    return /success|fail|partial/.test(s);
+  }
+
   function webcastUrl(launch) {
     const vids = launch.vidURLs || launch.vid_urls || [];
     if (vids.length) {
@@ -638,9 +644,18 @@
       );
 
       if (up.length) {
-        prog.next = launchToNext(up[0]);
-        /* Second upcoming = “Next up” when first is still In flight / Success */
-        prog.nextUp = up.length > 1 ? launchToNext(up[1]) : null;
+        /*
+         * Prefer first non-terminal (Go / Hold / In flight / TBC).
+         * LL2 often still lists a just-landed Success first — that made the
+         * desk stick on e.g. Starlink 10-19 while 17-49 was the real next.
+         * If every row is terminal, fall back to up[0] (Last flight desk).
+         */
+        const open = up.filter(function (L) {
+          return !isTerminalLaunch(L);
+        });
+        const pick = open.length ? open : up;
+        prog.next = launchToNext(pick[0]);
+        prog.nextUp = pick.length > 1 ? launchToNext(pick[1]) : null;
         /* Clear seed weather risk until enrichWeather fills */
         if (prog.weather) {
           prog.weather.risk = "—";

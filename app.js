@@ -889,9 +889,10 @@
    * Accurate shoreline: CARTO Dark tiles (OSM geometry) + local NE borders.
    * Markers always use true lat/lon (Google Maps / pad coords) — never fudged.
    * Coarse NE-only coasts painted beach pads "in water"; tiles fix that.
+   * CARTO basemaps require a free key (?key=) or tiles watermark "API key required".
    */
   const MAP_TILE_URL =
-    "https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png";
+    "https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png?key=cb1_27ow_1_73656a41346af19fc01d4d26";
   const GEO_COUNTRIES = "geo/countries.geojson";
   const GEO_STATES = "geo/states.geojson";
 

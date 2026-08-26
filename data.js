@@ -6,8 +6,8 @@ window.SPACEHUB_DATA = {
   year: 2026,
   fleetGoal: 145,
   fleetYtd: 90,
-  lastUpdated: "2026-07-26T18:00:00Z",
-  sitesRev: 37,
+  lastUpdated: "2026-08-26T18:00:00Z",
+  sitesRev: 38,
 
   /*
    * SpaceX site atlas — lat/lon checked against public maps / commonly cited pad coords.
@@ -15,6 +15,8 @@ window.SPACEHUB_DATA = {
    * Brownsville city center removed (was wrong — Starbase is ~17 mi east at Boca Chica).
    * Jul 2026 verify: user LZ-4 + Starbase Pad 2 / production / Massey's; other pins
    * cross-checked vs Falcon UG, Wikipedia/Wikidata, OSM, TCEQ where available.
+   * Aug 2026: Starbase Louisiana (Pecan Island) — planned; pin is coastal marsh
+   * south of the Hwy 82 community (no pad survey yet).
    */
   sites: [
     /* ── California ── */
@@ -156,6 +158,24 @@ window.SPACEHUB_DATA = {
       lon: -97.4061886,
       blurb:
         "Starlink manufacturing hub near Austin (858 FM 1209, Bastrop County) — satellites, user terminals, and electronics.",
+    },
+
+    /* ── Louisiana · Starbase (Pecan Island) — announced 25 Aug 2026 ── */
+    {
+      /*
+       * Approximate facility-area pin: ~5–8 mi south of Pecan Island (Hwy 82)
+       * toward the Gulf / Freshwater Bayou corridor. Town GNIS is
+       * 29.64667°N, 92.45306°W — launch complex is planned in the marsh
+       * south of that community, not at the town center. ~125k-acre tract;
+       * no surveyed pad centroid yet. Unofficial.
+       */
+      id: "starbase-la",
+      name: "Starbase Louisiana · planned",
+      kind: "launch",
+      lat: 29.575,
+      lon: -92.45,
+      blurb:
+        "Starbase Louisiana (Pecan Island / Freshwater Bayou, Vermilion Parish) — planned Starship spaceport on ~125,000 acres of former Exxon coastal marsh. Announced 25 Aug 2026 with Louisiana; construction targeted 2027, first launch ~2029. Vision: multiple launch complexes, propellant production, power, vehicle processing, deep-water barge access, and employee housing. Pin is approximate coastal-marsh area south of the Hwy 82 community — not a surveyed pad.",
     },
 
     /* ── Florida ── */

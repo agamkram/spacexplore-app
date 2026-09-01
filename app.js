@@ -1010,6 +1010,9 @@
     const name = (label || la + ", " + lo).trim();
     const q = encodeURIComponent(name);
     const ll = la + "," + lo;
+    /* Labeled pin only — do not also pass center= (that triggers a place-search
+       that often toasts “Something went wrong” while the map is fine). */
+    const pinQ = encodeURIComponent(ll + " (" + name + ")");
     const ua = navigator.userAgent || "";
     const isiOS =
       /iPad|iPhone|iPod/i.test(ua) ||
@@ -1018,8 +1021,7 @@
 
     if (isAndroid) {
       /* geo: prefers installed maps app (usually Google) — not a browser tab */
-      window.location.href =
-        "geo:" + la + "," + lo + "?q=" + encodeURIComponent(ll + "(" + name + ")");
+      window.location.href = "geo:" + la + "," + lo + "?q=" + pinQ;
       return;
     }
 
@@ -1029,7 +1031,7 @@
        * never left this page (Google not installed). A short timed fallback
        * opens BOTH apps when Google succeeds — cancel on hide/blur instead.
        */
-      const gmaps = "comgooglemaps://?q=" + ll + "&center=" + ll + "&zoom=16";
+      const gmaps = "comgooglemaps://?q=" + pinQ + "&zoom=16";
       const apple = "maps://?ll=" + ll + "&q=" + q;
       let handedOff = false;
       let timer = 0;

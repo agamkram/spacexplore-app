@@ -113,6 +113,11 @@ def fetch_spcx_quote():
 
 
 class Handler(SimpleHTTPRequestHandler):
+    # HTTP/1.1 keep-alive on ThreadingHTTPServer leaks a thread per idle
+    # client until the process accepts sockets and answers nothing (curl 000).
+    protocol_version = "HTTP/1.0"
+    timeout = 8
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(ROOT), **kwargs)
 

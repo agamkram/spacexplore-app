@@ -324,10 +324,30 @@
     }
   }
 
+  function pinOpenSheet() {
+    const sheet = el.sheet;
+    if (!sheet) return;
+    if (!sheet.open || !isPhoneShell()) {
+      sheet.style.bottom = "";
+      sheet.style.maxHeight = "";
+      return;
+    }
+    const vv = window.visualViewport;
+    const visH = vv && vv.height > 0 ? vv.height : window.innerHeight;
+    const visBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+    const below = Math.max(0, Math.round(window.innerHeight - visBottom));
+    const home = Math.round(readSafeInsetBottom());
+    const cssBottom = Math.max(8, below + (below < 1 ? home : 0));
+    const usedInside = cssBottom - below;
+    sheet.style.bottom = cssBottom + "px";
+    sheet.style.maxHeight = Math.max(140, Math.round(visH - usedInside - 8)) + "px";
+  }
+
   function openFactSheet(title, value, sub) {
     el.sheetTitle.textContent = title;
     el.sheetBody.textContent = value + (sub ? "\n" + sub : "");
     el.sheet.showModal();
+    requestAnimationFrame(pinOpenSheet);
   }
 
   const SITE_KIND_LABEL = {
@@ -1805,7 +1825,10 @@
   function scheduleFit() {
     cancelAnimationFrame(fitRaf);
     fitRaf = requestAnimationFrame(() => {
-      fitRaf = requestAnimationFrame(fitArtboard);
+      fitRaf = requestAnimationFrame(() => {
+        fitArtboard();
+        pinOpenSheet();
+      });
     });
   }
 
@@ -1924,6 +1947,7 @@
 
   try {
     el.sheetClose?.addEventListener("click", () => el.sheet?.close());
+    el.sheet?.addEventListener("close", pinOpenSheet);
     el.sheet?.addEventListener("click", (e) => {
       if (e.target === el.sheet) el.sheet.close();
     });

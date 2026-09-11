@@ -5,8 +5,10 @@ from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from urllib.request import Request, urlopen
 import json
+import re
 import ssl
 import sys
+import time
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_PORT = 8843
@@ -192,6 +194,55 @@ def fetch_ll2_bundle():
     return _ll2_mem
 
 
+STARLINK_COUNT_URL = "https://keeptrack.space/starlink-satellite-count"
+STARLINK_CACHE_MS = 60 * 60 * 1000
+_starlink_mem = {"at": 0, "working": None, "inOrbit": None}
+
+
+def parse_starlink_count(html):
+    m = re.search(
+        r"([\d,]+)\s+Starlink satellites in orbit[\s\S]{0,120}?([\d,]+)\s+working",
+        html or "",
+        re.I,
+    )
+    if not m:
+        return None
+    try:
+        in_orbit = int(m.group(1).replace(",", ""))
+        working = int(m.group(2).replace(",", ""))
+    except ValueError:
+        return None
+    if working < 1000:
+        return None
+    return {"working": working, "inOrbit": in_orbit}
+
+
+def fetch_starlink_count():
+    now = int(time.time() * 1000)
+    if (
+        _starlink_mem["at"]
+        and now - _starlink_mem["at"] < STARLINK_CACHE_MS
+        and _starlink_mem["working"] is not None
+    ):
+        return _starlink_mem
+    req = Request(
+        STARLINK_COUNT_URL,
+        headers={
+            "User-Agent": "SpaceXplore/1.0 (https://spacexplore.markmaga.com)",
+            "Accept": "text/html",
+        },
+    )
+    with urlopen(req, timeout=20) as res:
+        html = res.read().decode("utf-8", "replace")
+    parsed = parse_starlink_count(html)
+    if not parsed:
+        raise RuntimeError("starlink count parse failed")
+    _starlink_mem.update(
+        {"at": now, "working": parsed["working"], "inOrbit": parsed["inOrbit"]}
+    )
+    return _starlink_mem
+
+
 class Handler(SimpleHTTPRequestHandler):
     # HTTP/1.1 keep-alive on ThreadingHTTPServer leaks a thread per idle
     # client until the process accepts sockets and answers nothing (curl 000).
@@ -225,6 +276,43 @@ class Handler(SimpleHTTPRequestHandler):
             except Exception as err:
                 body = json.dumps({"ok": False, "error": str(err)}).encode("utf-8")
                 self.send_response(502)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            return
+        if path == "/api/starlink" or path == "/api/starlink/":
+            try:
+                b = fetch_starlink_count()
+                body = json.dumps(
+                    {
+                        "ok": True,
+                        "at": b["at"],
+                        "working": b["working"],
+                        "inOrbit": b["inOrbit"],
+                    }
+                ).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except Exception as err:
+                if _starlink_mem["working"] is not None:
+                    body = json.dumps(
+                        {
+                            "ok": True,
+                            "at": _starlink_mem["at"],
+                            "working": _starlink_mem["working"],
+                            "inOrbit": _starlink_mem["inOrbit"],
+                            "stale": True,
+                        }
+                    ).encode("utf-8")
+                    self.send_response(200)
+                else:
+                    body = json.dumps({"ok": False, "error": str(err)}).encode("utf-8")
+                    self.send_response(502)
                 self.send_header("Content-Type", "application/json; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()

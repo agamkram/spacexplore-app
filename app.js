@@ -557,6 +557,7 @@
       "SpaceXplore",
       "Unofficial desk for SpaceX launches, programs, sites, and cadence. Not affiliated with SpaceX.\n\n" +
         "Live next-flight and YTD from Launch Library (The Space Devs) via a shared server cache. " +
+        "Starlink working-sat count from KeepTrack via the same kind of cache. " +
         "Pad weather from Open-Meteo. SPCX via NASDAQ. Map: OSM · CARTO · Natural Earth.\n\n" +
         "Pins are facility centers, not survey-grade. POV is a desk estimate, not an official range product."
     );
@@ -1615,9 +1616,10 @@
 
   /**
    * Viewport fit
-   * - Safari tab (phone): pin stage to visualViewport (SolarDashboard).
+   * - Safari tab (phone + iPad): pin stage to visualViewport (GovDash).
    * - PWA A2HS (phone/iPad): Bug B — lock to screen fill height (SuperMoon).
    *   VV alone leaves ~5/16" black under the layout box.
+   *   Never stack VV height + env(safe-area-bottom).
    */
   function isStandaloneShell() {
     return (
@@ -1641,6 +1643,16 @@
       window.matchMedia("(pointer: coarse)").matches ||
       window.matchMedia("(hover: none)").matches
     );
+  }
+
+  /* GovDash isTouchShell — iPadOS reports Macintosh + maxTouchPoints > 1 */
+  function isCoarseTouch() {
+    const ua = navigator.userAgent || "";
+    if (/iPad|iPhone|iPod/i.test(ua)) return true;
+    if (navigator.platform === "MacIntel" && (navigator.maxTouchPoints || 0) > 1) {
+      return true;
+    }
+    return window.matchMedia("(hover: none) and (pointer: coarse)").matches;
   }
 
   function readSafeInsetBottom() {
@@ -1868,6 +1880,7 @@
      */
     if (standalone) {
       const total = syncPwaFillHeight();
+      stage.classList.remove("fit-stage--vv");
       stage.style.inset = "";
       stage.style.top = "0";
       stage.style.left = "0";
@@ -1875,10 +1888,24 @@
       stage.style.bottom = "auto";
       stage.style.width = "100%";
       stage.style.height = total > 0 ? total + "px" : "100%";
+    } else if (isCoarseTouch() && vv && vv.height > 40 && vv.width > 40) {
+      /* Safari tab (iPad included): visualViewport only — copy GovDash */
+      document.documentElement.classList.remove("pwa-standalone");
+      document.documentElement.style.removeProperty("--pwa-fill-h");
+      document.documentElement.style.removeProperty("--pwa-extra-b");
+      stage.classList.add("fit-stage--vv");
+      stage.style.inset = "";
+      stage.style.top = Math.round(vv.offsetTop) + "px";
+      stage.style.left = Math.round(vv.offsetLeft) + "px";
+      stage.style.right = "auto";
+      stage.style.bottom = "auto";
+      stage.style.width = Math.round(vv.width) + "px";
+      stage.style.height = Math.round(vv.height) + "px";
     } else {
       document.documentElement.classList.remove("pwa-standalone");
       document.documentElement.style.removeProperty("--pwa-fill-h");
       document.documentElement.style.removeProperty("--pwa-extra-b");
+      stage.classList.remove("fit-stage--vv");
       stage.style.inset = "0";
       stage.style.top = "";
       stage.style.left = "";
@@ -1902,7 +1929,11 @@
     }
 
     const fitKey =
-      (standalone ? "pwa-wide:" + pwaFillHeightPx() + "+" + pwaExtraBottomPx() : "wide") +
+      (standalone
+        ? "pwa-wide:" + pwaFillHeightPx() + "+" + pwaExtraBottomPx()
+        : isCoarseTouch() && vv
+          ? "vv-wide:" + Math.round(vv.width) + "x" + Math.round(vv.height)
+          : "wide") +
       ":" +
       sw +
       "x" +

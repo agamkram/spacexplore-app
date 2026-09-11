@@ -6,7 +6,7 @@ window.SPACEHUB_DATA = {
   year: 2026,
   fleetGoal: 145,
   fleetYtd: 108,
-  lastUpdated: "2026-09-11T21:00:00Z",
+  lastUpdated: "2026-09-11T22:00:00Z",
   sitesRev: 38,
 
   /*
@@ -408,7 +408,7 @@ window.SPACEHUB_DATA = {
           k: "Starlink",
           v: "11.1k",
           s: "sats working on orbit",
-          d: "About 11,100 working Starlink satellites on orbit (public trackers, Sep 2026). Count moves with launches, deorbits, and shell design. Open Orbital View for the live 3D picture.",
+          d: "Working Starlink satellites on orbit from KeepTrack via the desk count proxy. Count moves with launches, deorbits, and shell design. Open Orbital View for the live 3D picture.",
         },
         {
           k: "Orbital View",
@@ -1097,7 +1097,7 @@ window.SPACEHUB_DATA = {
           k: "Active sats",
           v: "11.1k",
           s: "working on orbit",
-          d: "On the order of 11,100 working Starlink satellites on orbit (public trackers, Sep 2026). That fleet is most of the active satellites above Earth — and it still grows with almost every Falcon week.",
+          d: "Working Starlink satellites on orbit from KeepTrack via the desk count proxy. That fleet is most of the active satellites above Earth — and it still grows with almost every Falcon week.",
         },
         {
           k: "Per launch",

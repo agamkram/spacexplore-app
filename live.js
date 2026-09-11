@@ -1,7 +1,7 @@
 /**
- * SpaceXplore live data — LL2 via /api/ll2 + Open-Meteo + Starlink availability.
+ * SpaceXplore live data — LL2 via /api/ll2 + Open-Meteo + Starlink availability / sat count.
  * Merges into SPACEHUB_DATA; keeps last desk data if the network fails.
- * LL2 is proxied (never from the browser). Starlink markets: starlink.com.
+ * LL2 and sat count are proxied (never from the browser). Starlink markets: starlink.com.
  */
 (function (global) {
   "use strict";
@@ -506,11 +506,17 @@
       lat +
       "&longitude=" +
       lon +
-      "&current=temperature_2m,precipitation,cloud_cover,wind_speed_10m" +
+      "&current=temperature_2m,precipitation_probability,cloud_cover,wind_speed_10m" +
+      "&hourly=precipitation_probability&forecast_hours=1" +
       "&wind_speed_unit=mph&timezone=auto";
     return fetchJson(url)
       .then(function (d) {
         const c = d.current || {};
+        const hourly = d.hourly || {};
+        let precipPct = c.precipitation_probability;
+        if (precipPct == null && Array.isArray(hourly.precipitation_probability)) {
+          precipPct = hourly.precipitation_probability[0];
+        }
         const data = {
           wind:
             c.wind_speed_10m != null
@@ -518,8 +524,8 @@
               : "—",
           cloud: c.cloud_cover != null ? Math.round(c.cloud_cover) + "%" : "—",
           precip:
-            c.precipitation != null
-              ? (Math.round(c.precipitation * 10) / 10) + " mm"
+            precipPct != null && precipPct !== ""
+              ? Math.round(Number(precipPct)) + "%"
               : "—",
           temp: c.temperature_2m,
         };
@@ -654,12 +660,10 @@
         const pick = open.length ? open : up;
         prog.next = launchToNext(pick[0]);
         prog.nextUp = pick.length > 1 ? launchToNext(pick[1]) : null;
-        /* Clear seed weather risk until enrichWeather fills */
         if (prog.weather) {
-          prog.weather.risk = "—";
-          prog.weather.wind = "—";
-          prog.weather.cloud = "—";
-          prog.weather.precip = "—";
+          prog.weather.pad = padWxKey(
+            pick[0] && pick[0].pad ? pick[0].pad : { name: prog.next.pad }
+          );
         }
       } else {
         /* Live window empty — don't keep a stale seed NET/countdown */
@@ -1188,6 +1192,73 @@
     DATA.spcx = quote;
   }
 
+  function formatSatsK(n) {
+    if (n == null || !Number.isFinite(n)) return null;
+    if (n >= 1000) return (Math.round(n / 100) / 10).toFixed(1) + "k";
+    return String(Math.round(n));
+  }
+
+  let satsCache = { at: 0, working: null, inOrbit: null };
+  const SATS_CACHE_MS = 60 * 60 * 1000;
+
+  function loadStarlinkSats() {
+    if (
+      satsCache.working != null &&
+      satsCache.at &&
+      Date.now() - satsCache.at < SATS_CACHE_MS
+    ) {
+      return Promise.resolve(satsCache);
+    }
+    return fetchJson("/api/starlink")
+      .then(function (d) {
+        if (!d || !d.ok || d.working == null) throw new Error("starlink sats fail");
+        satsCache = {
+          at: d.at || Date.now(),
+          working: Number(d.working),
+          inOrbit: d.inOrbit != null ? Number(d.inOrbit) : null,
+        };
+        return satsCache;
+      })
+      .catch(function (err) {
+        console.warn("SpaceXplore Starlink count failed", err);
+        return satsCache.working != null ? satsCache : null;
+      });
+  }
+
+  function applyStarlinkCount(DATA, sats) {
+    if (!DATA || !sats || sats.working == null || !Number.isFinite(sats.working)) {
+      return;
+    }
+    const label = formatSatsK(sats.working);
+    if (!label) return;
+    const working = Math.round(sats.working).toLocaleString("en-US");
+    const orbit =
+      sats.inOrbit != null && Number.isFinite(sats.inOrbit)
+        ? Math.round(sats.inOrbit).toLocaleString("en-US")
+        : null;
+    const d =
+      working +
+      " working Starlink satellites on orbit (KeepTrack catalog). " +
+      (orbit ? orbit + " in orbit including raising and failed units. " : "") +
+      "Live via desk count proxy.";
+    const machine = DATA.programs && DATA.programs.machine;
+    if (machine) {
+      setSpec(machine, "Starlink", label, "sats working on orbit");
+      const cell = (machine.specs || []).find(function (x) {
+        return x.k === "Starlink";
+      });
+      if (cell) cell.d = d;
+    }
+    const sl = DATA.programs && DATA.programs.starlink;
+    if (sl) {
+      setSpec(sl, "Active sats", label, "working on orbit");
+      const cell = (sl.specs || []).find(function (x) {
+        return x.k === "Active sats";
+      });
+      if (cell) cell.d = d;
+    }
+  }
+
   function refresh(opts) {
     const base = global.SPACEHUB_DATA;
     if (!base) return Promise.reject(new Error("No SPACEHUB_DATA"));
@@ -1247,7 +1318,24 @@
         return null;
       });
 
-    return Promise.all([ll2P, quoteP]).then(function () {
+    const satsP = loadStarlinkSats()
+      .then(function (sats) {
+        if (sats) {
+          applyStarlinkCount(base, sats);
+          if (onLl2) {
+            try {
+              onLl2({ phase: "sats" });
+            } catch (_) {}
+          }
+        }
+        return sats;
+      })
+      .catch(function (err) {
+        console.warn("SpaceXplore Starlink count failed", err);
+        return null;
+      });
+
+    return Promise.all([ll2P, quoteP, satsP]).then(function () {
       const liveOk = !!base.live;
       return {
         ok: liveOk,

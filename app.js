@@ -90,7 +90,6 @@
     sheetLink: document.getElementById("sheet-link"),
     sheetClose: document.getElementById("sheet-close"),
     aboutBtn: document.getElementById("about-btn"),
-    buildMark: document.getElementById("build-mark"),
     app: document.getElementById("app"),
   };
 
@@ -554,14 +553,12 @@
   }
 
   function openAbout() {
-    const build = el.buildMark ? el.buildMark.textContent.trim() : "";
     openFactSheet(
       "SpaceXplore",
       "Unofficial desk for SpaceX launches, programs, sites, and cadence. Not affiliated with SpaceX.\n\n" +
         "Live next-flight and YTD from Launch Library (The Space Devs) via a shared server cache. " +
         "Pad weather from Open-Meteo. SPCX via NASDAQ. Map: OSM · CARTO · Natural Earth.\n\n" +
-        "Pins are facility centers, not survey-grade. POV is a desk estimate, not an official range product." +
-        (build ? "\n\nBuild " + build : "")
+        "Pins are facility centers, not survey-grade. POV is a desk estimate, not an official range product."
     );
   }
 

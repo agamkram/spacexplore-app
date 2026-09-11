@@ -141,19 +141,6 @@ html.pwa-standalone .fit-stage {
   cursor: pointer;
 }
 
-.build-mark {
-  position: absolute;
-  right: 2px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-family: var(--mono);
-  font-size: 8px;
-  color: var(--faint);
-  letter-spacing: 0.06em;
-  pointer-events: none;
-  line-height: 1;
-}
-
 /* —— Picker —— */
 .picker {
   display: flex;

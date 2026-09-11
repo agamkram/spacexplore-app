@@ -126,6 +126,7 @@ html.pwa-standalone .fit-stage {
   min-height: calc(0.28in + 15px);
   flex-shrink: 0;
   min-width: 0;
+  position: relative;
 }
 
 .app-title {
@@ -137,6 +138,20 @@ html.pwa-standalone .fit-stage {
   line-height: 1.15;
   color: var(--text);
   text-align: center;
+  cursor: pointer;
+}
+
+.build-mark {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--faint);
+  letter-spacing: 0.06em;
+  pointer-events: none;
+  line-height: 1;
 }
 
 /* —— Picker —— */
@@ -722,7 +737,11 @@ html.pwa-standalone .fit-stage {
   overflow: hidden;
 }
 
-.scale-main { min-width: 0; overflow: hidden; }
+.scale-main {
+  min-width: 0;
+  overflow: hidden;
+  cursor: pointer;
+}
 
 .scale-k {
   font-size: 9px;
@@ -791,6 +810,16 @@ html.pwa-standalone .fit-stage {
   gap: 6px;
   font-size: 10px;
   min-width: 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  width: 100%;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: left;
 }
 
 .mini-stat .k { color: var(--faint); }
@@ -1140,7 +1169,7 @@ html.pwa-standalone .fit-stage {
   position: relative;
 }
 
-.mix-band > .band-label {
+.mix-band .band-label {
   display: block;
   margin-bottom: 0;
   line-height: 1.1;
@@ -1163,9 +1192,18 @@ html.pwa-standalone .fit-stage {
   text-align: center;
   min-width: 0;
   overflow: hidden;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  padding: 1px 0;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .mix-cell .k {
+  display: block;
   font-size: 8px;
   color: var(--faint);
   text-transform: uppercase;
@@ -1176,6 +1214,7 @@ html.pwa-standalone .fit-stage {
 }
 
 .mix-cell .v {
+  display: block;
   font-family: var(--mono);
   font-size: 13px;
   font-weight: 600;
@@ -1355,6 +1394,24 @@ dialog.sheet[open] {
   -webkit-overflow-scrolling: touch;
 }
 
+.sheet-link {
+  display: block;
+  margin: 0 0 8px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  border: 1px solid var(--line);
+  background: var(--cell);
+  padding: 7px;
+  border-radius: 6px;
+}
+
+.sheet-link[hidden] {
+  display: none !important;
+}
+
 .about-meta {
   font-size: 10px !important;
   color: var(--faint) !important;
@@ -1453,7 +1510,7 @@ dialog.sheet[open] {
     padding: 1px 4px 2px;
     margin-top: 1px;
   }
-  .mix-band > .band-label {
+  .mix-band .band-label {
     margin-bottom: 0;
     font-size: 8px;
   }

@@ -68,6 +68,8 @@
     scalePct: document.getElementById("scale-pct"),
     scaleFrac: document.getElementById("scale-frac"),
     scaleBar: document.getElementById("scale-bar"),
+    scaleK: document.getElementById("scale-k"),
+    scaleMain: document.getElementById("scale-main"),
     statStreak: document.getElementById("stat-streak"),
     statLand: document.getElementById("stat-land"),
     statSuccess: document.getElementById("stat-success"),
@@ -85,7 +87,10 @@
     sheet: document.getElementById("sheet"),
     sheetTitle: document.getElementById("sheet-title"),
     sheetBody: document.getElementById("sheet-body"),
+    sheetLink: document.getElementById("sheet-link"),
     sheetClose: document.getElementById("sheet-close"),
+    aboutBtn: document.getElementById("about-btn"),
+    buildMark: document.getElementById("build-mark"),
     app: document.getElementById("app"),
   };
 
@@ -250,9 +255,12 @@
   }
 
   function renderScale(p) {
-    const goal = p.yearGoal || 1;
-    const ytd = p.ytd || 0;
+    const goal = p.paceGoal || p.yearGoal || 1;
+    const ytd = p.paceYtd != null ? p.paceYtd : p.ytd || 0;
     const pct = Math.min(100, Math.round((ytd / goal) * 1000) / 10);
+    if (el.scaleK) {
+      el.scaleK.textContent = p.paceLabel || "Year pace · public target";
+    }
     el.scalePct.textContent = pct + "%";
     el.scaleFrac.textContent = ytd + " / " + goal;
     el.scaleBar.style.width = Math.min(100, pct) + "%";
@@ -269,7 +277,7 @@
     if (el.wCloud) el.wCloud.textContent = w.cloud || "—";
     if (el.wPrecip) el.wPrecip.textContent = w.precip || "—";
 
-    /* POV = Probability of Violation (range). Separate from pad surface cells. */
+    /* POV chip: desk estimate, not official range product */
     const pov = w.pov != null ? w.pov : w.risk;
     const povNum =
       typeof pov === "number"
@@ -305,22 +313,22 @@
     const note = (el.povBtn && el.povBtn.dataset.note) || "";
     const pct = pov ? pov + "%" : "—";
     openFactSheet(
-      "POV · range weather",
-      pct + " probability of violation",
+      "POV · desk estimate",
+      pct + " desk weather / go risk",
       note
         ? "Pad surface: " + pad + " · " + note
-        : "Pad surface shown left · " + pad,
-      "Range"
+        : "Pad surface shown left · " + pad
     );
     if (el.sheetBody) {
       el.sheetBody.textContent =
-        "POV (Probability of Violation) is the chance that launch-commit weather " +
-        "or customer rules fail during the window — the range go / no-go slice.\n\n" +
+        "This is a desk estimate — not official range Probability of Violation.\n\n" +
+        "If Launch Library publishes a go%, the number is 100 minus that go% " +
+        "(higher = less likely to fly). If not, it is a rough score from pad " +
+        "surface wind, cloud, and precip.\n\n" +
         "Shown: " +
         pct +
         (note ? " · " + note : "") +
-        "\n\nPad weather (left) is surface wind, cloud, and precip at the next pad. " +
-        "POV is not the same as pad surface alone.";
+        "\n\nPad weather (left) is surface wind, cloud, and precip at the next pad.";
     }
   }
 
@@ -343,9 +351,21 @@
     sheet.style.maxHeight = Math.max(140, Math.round(visH - usedInside - 8)) + "px";
   }
 
-  function openFactSheet(title, value, sub) {
+  function openFactSheet(title, value, sub, href) {
     el.sheetTitle.textContent = title;
     el.sheetBody.textContent = value + (sub ? "\n" + sub : "");
+    if (el.sheetLink) {
+      if (href) {
+        el.sheetLink.href = href;
+        el.sheetLink.hidden = false;
+        el.sheetLink.removeAttribute("hidden");
+        el.sheetLink.textContent = "Open link";
+      } else {
+        el.sheetLink.hidden = true;
+        el.sheetLink.setAttribute("hidden", "");
+        el.sheetLink.removeAttribute("href");
+      }
+    }
     el.sheet.showModal();
     requestAnimationFrame(pinOpenSheet);
   }
@@ -373,6 +393,10 @@
       if (!btn || !el.specsGrid.contains(btn)) return;
       const t = (program(activeId).specs || [])[Number(btn.dataset.i)];
       if (!t) return;
+      if (t.d) {
+        openFactSheet(t.k, t.d, "", t.href || "");
+        return;
+      }
       if (t.href) {
         window.open(t.href, "_blank", "noopener,noreferrer");
         return;
@@ -381,8 +405,7 @@
         openMap();
         return;
       }
-      if (t.d) openFactSheet(t.k, t.d);
-      else openFactSheet(t.k, t.v, t.s || "");
+      openFactSheet(t.k, t.v, t.s || "");
     });
   }
 
@@ -433,12 +456,19 @@
         `<span class="v">${escapeHtml(t.v)}</span>` +
         `<span class="s">${escapeHtml(t.s || "")}</span>`;
       btn.addEventListener("click", () => {
+        if (t.action === "map") {
+          openMap();
+          return;
+        }
+        if (t.d) {
+          openFactSheet(t.k, t.d, "", t.href || "");
+          return;
+        }
         if (t.href) {
           window.open(t.href, "_blank", "noopener,noreferrer");
           return;
         }
-        if (t.d) openFactSheet(t.k, t.d);
-        else openFactSheet(t.k, t.v, t.s || "");
+        openFactSheet(t.k, t.v, t.s || "");
       });
       el.contextGrid.appendChild(btn);
     });
@@ -447,13 +477,92 @@
   function renderMix(stats) {
     el.mixGrid.innerHTML = "";
     (stats || []).forEach((s) => {
-      const div = document.createElement("div");
-      div.className = "mix-cell";
-      div.innerHTML =
-        `<div class="k">${escapeHtml(s.k)}</div>` +
-        `<div class="v">${escapeHtml(String(s.v))}</div>`;
-      el.mixGrid.appendChild(div);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "mix-cell";
+      btn.innerHTML =
+        `<span class="k">${escapeHtml(s.k)}</span>` +
+        `<span class="v">${escapeHtml(String(s.v))}</span>`;
+      btn.addEventListener("click", () => {
+        if (s.d) openFactSheet(s.k, s.d);
+        else openFactSheet(s.k, String(s.v), s.s || "");
+      });
+      el.mixGrid.appendChild(btn);
     });
+  }
+
+  function openScaleSheet() {
+    const p = program(activeId);
+    const ytd = p.paceYtd != null ? p.paceYtd : p.ytd;
+    const goal = p.paceGoal || p.yearGoal;
+    if (activeId === "machine") {
+      openFactSheet(
+        "Year pace · Falcon target",
+        (ytd != null ? ytd : "—") + " / " + (goal || "—"),
+        "Falcon 9 + Heavy this year versus public Falcon guidance of about 145. Starship tests are in fleet YTD (Ops) but not in this bar."
+      );
+      return;
+    }
+    openFactSheet(
+      "Year pace",
+      (p.ytd != null ? p.ytd : "—") + " / " + (p.yearGoal || "—"),
+      "Launches this year versus this program’s desk target."
+    );
+  }
+
+  function openMiniSheet(which) {
+    const p = program(activeId);
+    const tiles = p.tiles || [];
+    if (which === "streak") {
+      const t = tiles.find((x) => /streak/i.test(x.k));
+      if (t && t.d) {
+        openFactSheet(t.k, t.d);
+        return;
+      }
+      openFactSheet(
+        "Success streak",
+        String(p.streak != null ? p.streak : "—"),
+        activeId === "machine"
+          ? "Agency consecutive successful orbital launches (all-time, Launch Library)."
+          : "Consecutive successes in the 2026 Launch Library window for this program — not all-time."
+      );
+      return;
+    }
+    if (which === "land") {
+      const t = tiles.find((x) => /land/i.test(x.k));
+      if (t && t.d) {
+        openFactSheet(t.k, t.d);
+        return;
+      }
+      openFactSheet(
+        "Landings YTD",
+        String(p.landingsYtd != null ? p.landingsYtd : "—"),
+        "Successful Falcon booster recoveries this year. Starship and Dragon show — (not Falcon landings)."
+      );
+      return;
+    }
+    const t = tiles.find((x) => /success/i.test(x.k) && !/streak/i.test(x.k));
+    if (t && t.d) {
+      openFactSheet(t.k, t.d);
+      return;
+    }
+    openFactSheet(
+      "Success",
+      p.successRate != null ? p.successRate + "%" : "—",
+      "Mission success rate this year from Launch Library outcomes."
+    );
+  }
+
+  function openAbout() {
+    const build = el.buildMark ? el.buildMark.textContent.trim() : "";
+    openFactSheet(
+      "SpaceXplore",
+      "Unofficial desk for SpaceX launches, programs, sites, and cadence. Not affiliated with SpaceX.\n\n" +
+        "Live next-flight and YTD from Launch Library (The Space Devs) via a shared server cache. " +
+        "Pad weather from Open-Meteo. SPCX via NASDAQ. Map: OSM · CARTO · Natural Earth.\n\n" +
+        "Pins are facility centers, not survey-grade. POV is a desk estimate, not an official range product." +
+        (build ? "\n\nBuild " + build : "")
+    );
   }
 
   /* Same 12 accounts on every program — SpaceX first */
@@ -569,32 +678,32 @@
     if (densTablet()) {
       return {
         max: { k: 14.4, v: 30, s: 16.8 },
-        min: { k: 7, v: 10, s: 7.5 },
+        min: { k: 8, v: 11, s: 8 },
       };
     }
     return {
       max: { k: 10, v: 21, s: 12 },
-      min: { k: 7, v: 10, s: 8 },
+      min: { k: 8, v: 11, s: 8 },
     };
   }
 
   function opsFitLimits() {
     if (densTablet()) {
       return {
-        k: [11.9, 5.5],
-        v: [16.6, 8],
-        s: [13.0, 5.5],
+        k: [11.9, 7.5],
+        v: [16.6, 9],
+        s: [13.0, 7.5],
       };
     }
     return {
-      k: [8.25, 5.5],
-      v: [11.5, 8],
-      s: [9, 5.5],
+      k: [8.25, 7.5],
+      v: [11.5, 9],
+      s: [9, 7.5],
     };
   }
 
   function onXFitLimits() {
-    return densTablet() ? [15.5, 7.5] : [9.5, 6.5];
+    return densTablet() ? [15.5, 8] : [9.5, 8];
   }
 
   function allSpecStrings(role) {
@@ -851,10 +960,7 @@
   }
 
   function hasHardWatch(n) {
-    const prec = (n.precision || "").toLowerCase();
-    const hard = prec === "minute" || prec === "hour";
-    const goish = /go/i.test(n.status || "") && !/no\s*go/i.test(n.status || "");
-    return hard && goish && !!(n.webcast);
+    return !!(n && n.webcast);
   }
 
   function siteById(id) {
@@ -1967,6 +2073,29 @@
       }
     });
     el.povBtn?.addEventListener("click", openPovSheet);
+    el.scaleMain?.addEventListener("click", openScaleSheet);
+    el.scaleMain?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        openScaleSheet();
+      }
+    });
+    document.getElementById("mini-streak")?.addEventListener("click", () =>
+      openMiniSheet("streak")
+    );
+    document.getElementById("mini-land")?.addEventListener("click", () =>
+      openMiniSheet("land")
+    );
+    document.getElementById("mini-success")?.addEventListener("click", () =>
+      openMiniSheet("success")
+    );
+    el.aboutBtn?.addEventListener("click", openAbout);
+    el.aboutBtn?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        openAbout();
+      }
+    });
 
     buildPicker();
     renderProgram(activeId);

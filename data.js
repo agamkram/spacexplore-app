@@ -5,8 +5,8 @@
 window.SPACEHUB_DATA = {
   year: 2026,
   fleetGoal: 145,
-  fleetYtd: 90,
-  lastUpdated: "2026-08-26T18:00:00Z",
+  fleetYtd: 108,
+  lastUpdated: "2026-09-11T21:00:00Z",
   sitesRev: 38,
 
   /*
@@ -334,9 +334,12 @@ window.SPACEHUB_DATA = {
       name: "Overview",
       accent: "#e8eef6",
       yearGoal: 145,
-      ytd: 90,
-      streak: 194,
-      landingsYtd: 88,
+      paceGoal: 145,
+      paceYtd: 88,
+      paceLabel: "Year pace · Falcon target",
+      ytd: 108,
+      streak: 212,
+      landingsYtd: 107,
       successRate: 99.4,
       specsTitle: "Profile",
       /* 1 Starbase lead · pads/factories/people · recovery/reuse · net/HQ/equity · sky */
@@ -403,9 +406,9 @@ window.SPACEHUB_DATA = {
         },
         {
           k: "Starlink",
-          v: "10.9k",
+          v: "11.1k",
           s: "sats working on orbit",
-          d: "About 10,800–10,900 working Starlink satellites on orbit (public trackers, mid/late 2026). Count moves with launches, deorbits, and shell design. Open Orbital View next for the live 3D picture.",
+          d: "About 11,100 working Starlink satellites on orbit (public trackers, Sep 2026). Count moves with launches, deorbits, and shell design. Open Orbital View for the live 3D picture.",
         },
         {
           k: "Orbital View",
@@ -433,9 +436,9 @@ window.SPACEHUB_DATA = {
       tiles: [
         {
           k: "YTD launches",
-          v: "90",
-          s: "of 145 year target",
-          d: "Orbital launches so far this year across Falcon, Heavy, and Starship versus the public desk target. This is the machine’s annual scoreboard — cadence made visible.",
+          v: "108",
+          s: "all vehicles · 2026",
+          d: "Orbital launches so far this year across Falcon, Heavy, and Starship. Year-pace uses Falcon 9 + Heavy versus the public Falcon target of 145.",
         },
         {
           k: "Cadence",
@@ -445,13 +448,13 @@ window.SPACEHUB_DATA = {
         },
         {
           k: "Success streak",
-          v: "194",
+          v: "212",
           s: "launches",
           d: "Consecutive successful orbital launches from the agency record (Launch Library). A long streak is the quiet product of design margins, ops discipline, and reflight experience.",
         },
         {
           k: "Landings YTD",
-          v: "88",
+          v: "107",
           s: "Falcon recoveries",
           d: "Successful Falcon booster recoveries this year — land or droneship. Every landing is inventory returned to the fleet instead of ocean expendable.",
         },
@@ -469,9 +472,9 @@ window.SPACEHUB_DATA = {
         },
       ],
       stats: [
-        { k: "Falcon 9", v: "87" },
-        { k: "Falcon Heavy", v: "1" },
-        { k: "Starship", v: "2" },
+        { k: "Falcon 9", v: "87", d: "Falcon 9 orbital launches this year. Year-pace uses this plus Heavy versus the public Falcon target of 145." },
+        { k: "Falcon Heavy", v: "1", d: "Falcon Heavy flights this year. Rare by design." },
+        { k: "Starship", v: "2", d: "Starship integrated flight tests this year. In fleet YTD, not in the Falcon target bar." },
       ],
       media: [
         { handle: "@SpaceX", title: "SpaceX", url: "https://x.com/SpaceX" },
@@ -908,6 +911,7 @@ window.SPACEHUB_DATA = {
           k: "Sites",
           v: "TX · FL",
           s: "Starbase · 39A path",
+          action: "map",
           d: "Starbase flies now. Florida Starship (LC-39A and SLC-37 path) is the east-coast expansion so national security and high cadence are not stuck on one Texas pad.",
         },
         {
@@ -1091,9 +1095,9 @@ window.SPACEHUB_DATA = {
       specs: [
         {
           k: "Active sats",
-          v: "10.9k",
+          v: "11.1k",
           s: "working on orbit",
-          d: "On the order of 10,800–10,900 working Starlink satellites on orbit (public trackers). That fleet is most of the active satellites above Earth — and it still grows with almost every Falcon week.",
+          d: "On the order of 11,100 working Starlink satellites on orbit (public trackers, Sep 2026). That fleet is most of the active satellites above Earth — and it still grows with almost every Falcon week.",
         },
         {
           k: "Per launch",

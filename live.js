@@ -1,13 +1,12 @@
 /**
- * SpaceXplore live data — LL2 + Open-Meteo + Starlink availability.
+ * SpaceXplore live data — LL2 via /api/ll2 + Open-Meteo + Starlink availability.
  * Merges into SPACEHUB_DATA; keeps last desk data if the network fails.
- * LL2: The Space Devs. Starlink markets: starlink.com public availability.
+ * LL2 is proxied (never from the browser). Starlink markets: starlink.com.
  */
 (function (global) {
   "use strict";
 
-  const LL2 = "https://ll.thespacedevs.com/2.2.0";
-  const LSP_SPACEX = 121;
+  const LL2_PROXY = "/api/ll2";
   const STARLINK_AVAIL =
     "https://www.starlink.com/public-files/availability.json";
   const CACHE_MS = 12 * 60 * 1000; /* ~12 min — polite for free tier */
@@ -19,6 +18,7 @@
     agency: null,
     upcoming: [],
     previous: [],
+    previousOk: false,
     markets: null,
     marketsAt: 0,
   };
@@ -254,6 +254,24 @@
 
   function filterPrevious(list, programId) {
     return filterUpcoming(list, programId);
+  }
+
+  function isSuccessStatus(L) {
+    return /Success/i.test((L && L.status && L.status.name) || "");
+  }
+
+  function isFailStatus(L) {
+    return /Fail|Partial/i.test((L && L.status && L.status.name) || "");
+  }
+
+  /** Newest-first list. Stops at first failure. YTD window only if list is YTD. */
+  function consecutiveStreak(list) {
+    let n = 0;
+    for (let i = 0; i < (list || []).length; i++) {
+      if (isSuccessStatus(list[i])) n++;
+      else if (isFailStatus(list[i])) break;
+    }
+    return n;
   }
 
   function padBlob(launch) {
@@ -507,7 +525,7 @@
         };
         data.pov = proxyPov(data);
         data.povNote =
-          "Desk estimate from surface weather · not official range POV";
+          "Desk weather estimate from pad surface wind / cloud / precip — not official range POV";
         wxCache[key] = { at: Date.now(), data: data };
         return data;
       })
@@ -561,63 +579,43 @@
       });
   }
 
+  function attachMarkets(bundle) {
+    return loadStarlinkMarkets()
+      .catch(function () {
+        return cache.markets;
+      })
+      .then(function (markets) {
+        bundle.markets = markets != null ? markets : cache.markets;
+        bundle.marketsAt = Date.now();
+        return bundle;
+      });
+  }
+
   function loadLl2() {
     if (cache.at && Date.now() - cache.at < CACHE_MS && cache.upcoming.length) {
-      return Promise.resolve(cache);
+      return attachMarkets(cache);
     }
-    const y0 = yearStartIso();
-    const qUpcoming =
-      LL2 +
-      "/launch/upcoming/?lsp__id=" +
-      LSP_SPACEX +
-      "&limit=40&mode=detailed&ordering=net";
-    const qPrevious =
-      LL2 +
-      "/launch/previous/?lsp__id=" +
-      LSP_SPACEX +
-      "&net__gte=" +
-      encodeURIComponent(y0) +
-      "&limit=100&mode=detailed&ordering=-net";
-    const qAgency = LL2 + "/agencies/" + LSP_SPACEX + "/";
-
-    /*
-     * Upcoming is critical for Next flight. Do not let previous/agency/markets
-     * rate-limits (429) abort the whole refresh and leave July seed NETs stuck.
-     */
-    return fetchJson(qUpcoming)
-      .then(function (up) {
-        const upcoming = up.results || [];
-        return Promise.all([
-          Promise.resolve(upcoming),
-          fetchPagedResults(qPrevious).catch(function (err) {
-            console.warn("LL2 previous failed — keep prior cache", err);
-            return cache.previous || [];
-          }),
-          fetchJson(qAgency).catch(function (err) {
-            console.warn("LL2 agency failed — keep prior cache", err);
-            return cache.agency || null;
-          }),
-          loadStarlinkMarkets().catch(function () {
-            return cache.markets;
-          }),
-        ]);
-      })
-      .then(function (parts) {
-        cache = {
-          at: Date.now(),
-          upcoming: parts[0] || [],
-          previous: parts[1] || cache.previous || [],
-          agency: parts[2] != null ? parts[2] : cache.agency || null,
-          markets: parts[3] != null ? parts[3] : cache.markets,
-          marketsAt: cache.marketsAt || Date.now(),
-        };
-        return cache;
-      });
+    return fetchJson(LL2_PROXY).then(function (d) {
+      if (!d || !d.ok) throw new Error("ll2 proxy failed");
+      const prevOk = !!d.previousOk;
+      const lastPrev = cache.previous || [];
+      cache = {
+        at: d.at || Date.now(),
+        upcoming: d.upcoming || [],
+        previous: prevOk ? d.previous || [] : lastPrev,
+        previousOk: prevOk || lastPrev.length > 0,
+        agency: d.agency != null ? d.agency : cache.agency || null,
+        markets: cache.markets,
+        marketsAt: cache.marketsAt,
+      };
+      return attachMarkets(cache);
+    });
   }
 
   function applyLiveToData(base, live) {
     const DATA = base;
-    const stats = computeStats(live.previous, live.agency);
+    const prevOk = live.previousOk === true;
+    const stats = computeStats(prevOk ? live.previous : [], live.agency);
     const year = new Date().getUTCFullYear();
     const markets =
       live.markets != null
@@ -628,7 +626,7 @@
     const marketsLabel = markets != null ? String(markets) : "160+";
 
     DATA.year = year;
-    DATA.fleetYtd = stats.ytd;
+    if (prevOk) DATA.fleetYtd = stats.ytd;
     DATA.lastUpdated = new Date(live.at || Date.now()).toISOString();
     DATA.live = true;
     DATA.starlinkMarkets = markets;
@@ -692,42 +690,55 @@
         }
       }
 
-      prog.ytd =
-        id === "machine"
-          ? stats.ytd
-          : id === "falcon9"
-            ? stats.f9
-            : id === "heavy"
-              ? stats.fh
-              : id === "starship"
-                ? stats.ship
-                : id === "starlink"
-                  ? stats.starlink
-                  : id === "dragon"
-                    ? stats.dragon
-                    : prev.length;
+      if (prevOk) {
+        prog.ytd =
+          id === "machine"
+            ? stats.ytd
+            : id === "falcon9"
+              ? stats.f9
+              : id === "heavy"
+                ? stats.fh
+                : id === "starship"
+                  ? stats.ship
+                  : id === "starlink"
+                    ? stats.starlink
+                    : id === "dragon"
+                      ? stats.dragon
+                      : prev.length;
+      }
 
-      /* Scale band: program-scoped where we have it */
+      /* Scale / mini-stats: never write 0s over seed when previous fetch failed */
       if (id === "machine") {
-        prog.streak = stats.streak != null ? stats.streak : prog.streak;
-        prog.landingsYtd = stats.landOk;
-        prog.successRate =
-          stats.successPct != null ? stats.successPct : prog.successRate;
+        if (stats.streak != null) prog.streak = stats.streak;
+        if (prevOk) {
+          prog.landingsYtd = stats.landOk;
+          if (stats.successPct != null) prog.successRate = stats.successPct;
+          prog.paceYtd = stats.f9 + stats.fh;
+          prog.paceGoal = 145;
+          prog.paceLabel = "Year pace · Falcon target";
+        }
       } else if (id === "falcon9" || id === "heavy" || id === "starlink") {
-        prog.landingsYtd = st.landOk;
-        prog.successRate =
-          st.successPct != null ? st.successPct : prog.successRate;
-        prog.streak = stats.streak != null ? stats.streak : prog.streak;
+        if (prevOk) {
+          prog.landingsYtd = st.landOk;
+          if (st.successPct != null) prog.successRate = st.successPct;
+          prog.streak = consecutiveStreak(prev);
+        }
       } else if (id === "starship") {
-        prog.successRate =
-          st.successPct != null ? st.successPct : prog.successRate;
-        prog.landingsYtd = "—";
-        prog.streak = st.ytd || prog.streak;
+        if (prevOk) {
+          if (st.successPct != null) prog.successRate = st.successPct;
+          prog.landingsYtd = "—";
+          prog.streak = consecutiveStreak(prev);
+        }
       } else if (id === "dragon") {
-        prog.successRate =
-          st.successPct != null ? st.successPct : prog.successRate;
-        prog.landingsYtd = st.ytd; /* splashdowns ≈ missions when successful */
-        prog.streak = st.ytd || prog.streak;
+        if (prevOk) {
+          if (st.successPct != null) prog.successRate = st.successPct;
+          prog.landingsYtd = "—";
+          prog.streak = consecutiveStreak(prev);
+        }
+      }
+
+      if (!prevOk) {
+        return;
       }
 
       if (id === "machine") {
@@ -750,15 +761,27 @@
           }
         }
         prog.stats = [
-          { k: "Falcon 9", v: String(stats.f9) },
-          { k: "Falcon Heavy", v: String(stats.fh) },
-          { k: "Starship", v: String(stats.ship) },
+          {
+            k: "Falcon 9",
+            v: String(stats.f9),
+            d: "Falcon 9 orbital launches this year (Launch Library). Year-pace uses Falcon 9 + Heavy versus the public Falcon target of 145.",
+          },
+          {
+            k: "Falcon Heavy",
+            v: String(stats.fh),
+            d: "Falcon Heavy flights this year. Rare by design — high-energy missions, not weekly cadence.",
+          },
+          {
+            k: "Starship",
+            v: String(stats.ship),
+            d: "Starship integrated flight tests this year. In fleet YTD, not in the Falcon target bar.",
+          },
         ];
         prog.tiles = withTileDesc(prog, [
           {
             k: "YTD launches",
             v: String(stats.ytd),
-            s: "of " + (prog.yearGoal || DATA.fleetGoal) + " year target",
+            s: "all vehicles · " + year,
           },
           {
             k: "Cadence",
@@ -794,10 +817,10 @@
         const other = Math.max(0, stats.f9 - slOnF9);
         const rs = prev.filter(isRideshare).length;
         prog.stats = [
-          { k: "Starlink", v: String(slOnF9) },
-          { k: "Other", v: String(other) },
-          { k: "Rideshare", v: String(rs) },
-          { k: "YTD", v: String(stats.f9) },
+          { k: "Starlink", v: String(slOnF9), d: "Falcon 9 Starlink missions this year." },
+          { k: "Other", v: String(other), d: "Falcon 9 missions this year that were not Starlink stacks." },
+          { k: "Rideshare", v: String(rs), d: "Transporter / Bandwagon / rideshare F9 flights this year." },
+          { k: "YTD", v: String(stats.f9), d: "All Falcon 9 orbital launches this year (Launch Library)." },
         ];
         const land = landingModeFromNext(prog.next);
         prog.tiles = withTileDesc(prog, [
@@ -839,10 +862,10 @@
         const pad =
           (prog.next && prog.next.pad) || "LC-39A · Kennedy";
         prog.stats = [
-          { k: "YTD", v: String(stats.fh) },
-          { k: "Year target", v: String(prog.yearGoal || "—") },
-          { k: "Landings", v: String(st.landOk) },
-          { k: "Pad", v: "39A" },
+          { k: "YTD", v: String(stats.fh), d: "Falcon Heavy flights this year." },
+          { k: "Year target", v: String(prog.yearGoal || "—"), d: "Soft desk target for Heavy flights this year." },
+          { k: "Landings", v: String(st.landOk), d: "Successful Heavy booster recoveries logged this year." },
+          { k: "Pad", v: "39A", d: "LC-39A at Kennedy is Heavy’s primary home." },
         ];
         prog.tiles = withTileDesc(prog, [
           {
@@ -878,10 +901,10 @@
         ]);
       } else if (id === "starship") {
         prog.stats = [
-          { k: "Flights YTD", v: String(stats.ship) },
-          { k: "Year target", v: String(prog.yearGoal || "—") },
-          { k: "Success", v: st.successPct != null ? st.successPct + "%" : "—" },
-          { k: "Catch", v: "Tower" },
+          { k: "Flights YTD", v: String(stats.ship), d: "Starship integrated flight tests this year." },
+          { k: "Year target", v: String(prog.yearGoal || "—"), d: "Soft desk target for Starship flight tests this year." },
+          { k: "Success", v: st.successPct != null ? st.successPct + "%" : "—", d: "Launch Library outcomes for Starship flights this year." },
+          { k: "Catch", v: "Tower", d: "Mechazilla chopsticks at Starbase — the reuse bet unique to Ship." },
         ];
         prog.tiles = withTileDesc(prog, [
           {
@@ -908,6 +931,7 @@
             k: "Sites",
             v: "TX · FL",
             s: "Starbase now · 39A path",
+            action: "map",
           },
           {
             k: "Next",
@@ -917,10 +941,10 @@
         ]);
       } else if (id === "dragon") {
         prog.stats = [
-          { k: "Crew YTD", v: String(st.crew) },
-          { k: "Cargo YTD", v: String(st.cargo) },
-          { k: "Total", v: String(stats.dragon) },
-          { k: "Year target", v: String(prog.yearGoal || "—") },
+          { k: "Crew YTD", v: String(st.crew), d: "Crew Dragon missions flown this year." },
+          { k: "Cargo YTD", v: String(st.cargo), d: "Cargo Dragon missions flown this year." },
+          { k: "Total", v: String(stats.dragon), d: "All Dragon missions this year (crew + cargo)." },
+          { k: "Year target", v: String(prog.yearGoal || "—"), d: "Soft desk target for Dragon flights this year." },
         ];
         prog.tiles = withTileDesc(prog, [
           {
@@ -967,10 +991,10 @@
           "globally"
         );
         prog.stats = [
-          { k: "Missions YTD", v: String(stats.starlink) },
-          { k: "Year target", v: String(prog.yearGoal || "—") },
-          { k: "of fleet", v: share },
-          { k: "Markets", v: marketsLabel },
+          { k: "Missions YTD", v: String(stats.starlink), d: "Starlink launch missions this year." },
+          { k: "Year target", v: String(prog.yearGoal || "—"), d: "Soft desk target for Starlink missions this year." },
+          { k: "of fleet", v: share, d: "Share of all SpaceX launches this year that were Starlink." },
+          { k: "Markets", v: marketsLabel, d: "Countries / markets where Starlink is listed as available or launched." },
         ];
         prog.tiles = withTileDesc(prog, [
           {
@@ -1042,7 +1066,7 @@
             const go = Number(n.probability);
             prog.weather.pov = Math.max(5, Math.min(90, 100 - go));
             prog.weather.povNote =
-              "From Launch Library probability · not official range POV";
+              "Shown as 100 minus Launch Library go%. Desk estimate — not official range POV";
           } else {
             prog.weather.pov = wx.pov;
             prog.weather.povNote = wx.povNote;

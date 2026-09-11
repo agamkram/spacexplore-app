@@ -112,6 +112,86 @@ def fetch_spcx_quote():
     }
 
 
+LL2 = "https://ll.thespacedevs.com/2.2.0"
+LL2_CACHE_MS = 12 * 60 * 1000
+_ll2_mem = {"at": 0, "upcoming": [], "previous": [], "previousOk": False, "agency": None}
+
+
+def _ll2_json(url):
+    req = Request(
+        url,
+        headers={
+            "User-Agent": "SpaceXplore/1.0 (https://spacexplore.markmaga.com)",
+            "Accept": "application/json",
+        },
+    )
+    with urlopen(req, timeout=20) as res:
+        return json.loads(res.read().decode("utf-8"))
+
+
+def _ll2_paged(url, max_pages=4):
+    acc = []
+    nxt = url
+    for _ in range(max_pages):
+        if not nxt:
+            break
+        data = _ll2_json(nxt)
+        acc.extend(data.get("results") or [])
+        nxt = data.get("next")
+    return acc
+
+
+def fetch_ll2_bundle():
+    import datetime
+    import time
+    from urllib.parse import quote
+
+    now = int(time.time() * 1000)
+    if (
+        _ll2_mem["at"]
+        and now - _ll2_mem["at"] < LL2_CACHE_MS
+        and _ll2_mem["upcoming"]
+    ):
+        return _ll2_mem
+    y0 = "%d-01-01T00:00:00Z" % datetime.datetime.utcnow().year
+    up = _ll2_json(
+        LL2
+        + "/launch/upcoming/?lsp__id=121&limit=40&mode=detailed&ordering=net"
+    )
+    upcoming = up.get("results") or []
+    previous = _ll2_mem["previous"] or []
+    previous_ok = False
+    try:
+        qprev = (
+            LL2
+            + "/launch/previous/?lsp__id=121&net__gte="
+            + quote(y0)
+            + "&limit=100&mode=detailed&ordering=-net"
+        )
+        previous = _ll2_paged(qprev, 4)
+        previous_ok = True
+    except Exception as err:
+        sys.stderr.write("ll2 previous failed: %s\n" % err)
+        previous_ok = bool(_ll2_mem["previousOk"] and _ll2_mem["previous"])
+        previous = _ll2_mem["previous"] or []
+    agency = _ll2_mem["agency"]
+    try:
+        agency = _ll2_json(LL2 + "/agencies/121/")
+    except Exception as err:
+        sys.stderr.write("ll2 agency failed: %s\n" % err)
+        agency = _ll2_mem["agency"]
+    _ll2_mem.update(
+        {
+            "at": now,
+            "upcoming": upcoming,
+            "previous": previous,
+            "previousOk": previous_ok,
+            "agency": agency,
+        }
+    )
+    return _ll2_mem
+
+
 class Handler(SimpleHTTPRequestHandler):
     # HTTP/1.1 keep-alive on ThreadingHTTPServer leaks a thread per idle
     # client until the process accepts sockets and answers nothing (curl 000).
@@ -123,6 +203,33 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         path = self.path.split("?", 1)[0]
+        if path == "/api/ll2" or path == "/api/ll2/":
+            try:
+                b = fetch_ll2_bundle()
+                body = json.dumps(
+                    {
+                        "ok": True,
+                        "at": b["at"],
+                        "upcoming": b["upcoming"],
+                        "previous": b["previous"],
+                        "previousOk": b["previousOk"],
+                        "agency": b["agency"],
+                    }
+                ).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except Exception as err:
+                body = json.dumps({"ok": False, "error": str(err)}).encode("utf-8")
+                self.send_response(502)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            return
         if path == "/api/spcx" or path == "/api/spcx/":
             try:
                 quote = fetch_spcx_quote()

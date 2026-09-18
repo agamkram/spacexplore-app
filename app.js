@@ -1030,9 +1030,9 @@
   function pinIcon(isNext, large, nextColor) {
     const Lref = window.L;
     if (!Lref || !Lref.divIcon) return undefined;
-    /* Visible dot size vs larger hit box for mobile taps */
+    /* Hit box = visible dot only (pads are dense) */
     const dot = large ? (isNext ? 14 : 10) : isNext ? 12 : 8;
-    const hit = large ? 32 : 28;
+    const hit = dot;
     const color = isNext ? nextColor || nextPinAccent(null) : "#f2f5fa";
     const ring = isNext
       ? "box-shadow:0 0 0 2px rgba(4,6,10,0.95),0 0 12px " + color + ";"
@@ -1409,9 +1409,9 @@
               escapeHtml(s.name) +
               (isNext ? " · Next" : "") +
               "</strong>" +
-              "<div class='sh-pop-kind'>" +
+              " <span class='sh-pop-kind'>" +
               escapeHtml(kind) +
-              "</div>" +
+              "</span>" +
               "<p class='sh-pop-blurb'>" +
               escapeHtml(blurb) +
               "</p>" +

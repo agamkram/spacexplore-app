@@ -85,7 +85,7 @@ window.SPACEHUB_DATA = {
     },
     {
       id: "longbeach",
-      name: "Long Beach · recovery",
+      name: "Long Beach",
       kind: "support",
       lat: 33.74442,
       lon: -118.22257,
@@ -235,7 +235,7 @@ window.SPACEHUB_DATA = {
     },
     {
       id: "port",
-      name: "Port Canaveral · recovery",
+      name: "Port Canaveral",
       kind: "support",
       lat: 28.41701,
       lon: -80.62400,
@@ -317,7 +317,7 @@ window.SPACEHUB_DATA = {
     },
     {
       id: "io-asds",
-      name: "Indian Ocean · recovery",
+      name: "Indian Ocean",
       kind: "landing",
       lat: -15.5,
       lon: 72.5,

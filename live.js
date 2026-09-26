@@ -80,12 +80,15 @@
     return /Falcon\s*9/i.test(n) && !/Heavy/i.test(n);
   }
 
-  function isHeavy(launch) {
-    return /Heavy/i.test(cfgName(launch));
+  function isStarship(launch) {
+    const n = cfgName(launch) + " " + (launch.name || "");
+    return /Starship|Super\s*Heavy/i.test(n);
   }
 
-  function isStarship(launch) {
-    return /Starship/i.test(cfgName(launch)) || /Starship/i.test(launch.name || "");
+  function isHeavy(launch) {
+    /* Super Heavy is Starship. Falcon Heavy is the only Heavy vehicle. */
+    if (isStarship(launch)) return false;
+    return /Heavy/i.test(cfgName(launch));
   }
 
   function isFalconFamily(launch) {
@@ -910,6 +913,13 @@
           { k: "Success", v: st.successPct != null ? st.successPct + "%" : "—", d: "Launch Library outcomes for Starship flights this year." },
           { k: "Catch", v: "Tower", d: "Mechazilla chopsticks at Starbase — the reuse bet unique to Ship." },
         ];
+        const nextPad = (prog.next && prog.next.pad) || "";
+        const nextPadKnown = !!(nextPad && nextPad !== "—");
+        let nextPadSub = "Starbase";
+        if (/39A/i.test(nextPad)) nextPadSub = "Kennedy";
+        else if (/SLC-?37|Cape|CCSFS/i.test(nextPad)) nextPadSub = "Cape Canaveral";
+        else if (/Vandenberg|SLC-?4E|SLC-?6\b/i.test(nextPad)) nextPadSub = "Vandenberg";
+        else if (!nextPadKnown) nextPadSub = "pad not set";
         prog.tiles = withTileDesc(prog, [
           {
             k: "Flights YTD",
@@ -939,8 +949,15 @@
           },
           {
             k: "Next",
-            v: prog.next && prog.next.pad ? "Pad 2" : "—",
-            s: (prog.next && prog.next.pad) || "Starbase",
+            v: nextPadKnown ? nextPad : "—",
+            s: nextPadSub,
+            d: nextPadKnown
+              ? "Next pad from the live manifest: " +
+                nextPad +
+                " · " +
+                nextPadSub +
+                ". NET dates move with hardware, weather, and licenses."
+              : "No upcoming Starship pad in the live window.",
           },
         ]);
       } else if (id === "dragon") {

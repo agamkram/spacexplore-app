@@ -9,7 +9,7 @@
   const LL2_PROXY = "/api/ll2";
   const STARLINK_AVAIL =
     "https://www.starlink.com/public-files/availability.json";
-  const CACHE_MS = 12 * 60 * 1000; /* ~12 min — polite for free tier */
+  const CACHE_MS = 5 * 60 * 1000; /* ~5 min — server coalesces; launch status moves */
   const WX_CACHE_MS = 20 * 60 * 1000;
   const MARKETS_CACHE_MS = 6 * 60 * 60 * 1000; /* 6 h */
 
@@ -655,17 +655,47 @@
          * Prefer first non-terminal (Go / Hold / In flight / TBC).
          * LL2 often still lists a just-landed Success first — that made the
          * desk stick on e.g. Starlink 10-19 while 17-49 was the real next.
-         * If every row is terminal, fall back to up[0] (Last flight desk).
+         * Exception: a Success / Fail from the last few hours IS the current
+         * mission (Crew-13 launch day). Keep it so the band can say Last /
+         * In flight, and put the real next in nextUp.
          */
+        const first = up[0];
         const open = up.filter(function (L) {
           return !isTerminalLaunch(L);
         });
-        const pick = open.length ? open : up;
-        prog.next = launchToNext(pick[0]);
-        prog.nextUp = pick.length > 1 ? launchToNext(pick[1]) : null;
+        const firstStatus = (
+          (first && first.status && first.status.name) ||
+          ""
+        ).toLowerCase();
+        const firstNet = first && first.net ? new Date(first.net).getTime() : NaN;
+        const firstAge = Number.isFinite(firstNet)
+          ? Date.now() - firstNet
+          : Infinity;
+        const keepFirst =
+          /in\s*flight/.test(firstStatus) ||
+          (isTerminalLaunch(first) &&
+            firstAge >= 0 &&
+            firstAge < 6 * 3600 * 1000);
+
+        let head;
+        let trail;
+        if (keepFirst) {
+          head = first;
+          trail = open.filter(function (L) {
+            return L !== first;
+          });
+        } else if (open.length) {
+          head = open[0];
+          trail = open.slice(1);
+        } else {
+          head = first;
+          trail = up.slice(1);
+        }
+        prog.next = launchToNext(head);
+        prog.nextUp = trail.length ? launchToNext(trail[0]) : null;
         if (prog.weather) {
           prog.weather.pad = padWxKey(
-            pick[0] && pick[0].pad ? pick[0].pad : { name: prog.next.pad }
+            head && head.pad ? head.pad : { name: prog.next.pad }
           );
         }
       } else {

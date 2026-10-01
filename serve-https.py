@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """Serve SpaceXplore over HTTPS on all interfaces for multi-device LAN preview.
 Also proxies /api/spcx for live NASDAQ quote (browser CORS blocks finance hosts)."""
-# --- preview-ctl guard v2: begin ---
-# Managed by ~/bin/preview-ctl.py. Two hazards this removes:
+# --- preview-ctl guard v3: begin ---
+# Managed by ~/bin/preview-ctl.py. Three hazards this removes:
 #   1. The launching terminal can go away while the server runs on. Writing an
 #      access-log line to a dead pipe would raise mid-response and leave the
 #      port open and silent. Make stdio unable to raise.
 #   2. A browser or phone that walks away mid-response is normal, not an error.
 #      Left alone it writes a traceback per disconnect into the log.
+#   3. TLS on the listening socket puts the handshake inside accept() on the
+#      main thread. One client that opens a socket and never sends a
+#      ClientHello then stops the whole server: it accepts and answers
+#      nothing. Hand the handshake to the worker thread, where the handler's
+#      timeout can end it.
+import socket as _pc_socket
 import socketserver as _pc_ss
 import ssl as _pc_ssl
 import sys as _pc_sys
@@ -50,6 +56,7 @@ _PC_QUIET_ERRORS = (
     ConnectionResetError,
     ConnectionAbortedError,
     TimeoutError,
+    _pc_socket.timeout,
     _pc_ssl.SSLError,
 )
 _pc_handle_error = _pc_ss.BaseServer.handle_error
@@ -62,8 +69,26 @@ def _pc_quiet_handle_error(self, request, client_address):
 
 
 _pc_ss.BaseServer.handle_error = _pc_quiet_handle_error
-# --- preview-ctl guard v2: end ---
 
+_pc_wrap_socket = _pc_ssl.SSLContext.wrap_socket
+
+
+def _pc_lazy_wrap(self, sock, server_side=False, do_handshake_on_connect=True,
+                  *args, **kwargs):
+    """Never shake hands on the thread that calls accept()."""
+    if server_side:
+        do_handshake_on_connect = False
+    return _pc_wrap_socket(
+        self, sock, server_side, do_handshake_on_connect, *args, **kwargs
+    )
+
+
+_pc_ssl.SSLContext.wrap_socket = _pc_lazy_wrap
+
+# A deferred handshake runs on the first read, so the read needs a deadline.
+if _pc_ss.StreamRequestHandler.timeout is None:
+    _pc_ss.StreamRequestHandler.timeout = 20
+# --- preview-ctl guard v3: end ---
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from urllib.request import Request, urlopen
@@ -71,6 +96,7 @@ import json
 import re
 import ssl
 import sys
+import threading
 import time
 
 ROOT = Path(__file__).resolve().parent
@@ -178,11 +204,53 @@ def fetch_spcx_quote():
 
 
 LL2 = "https://ll.thespacedevs.com/2.2.0"
-LL2_CACHE_MS = 12 * 60 * 1000
+LL2_CACHE_MS = 5 * 60 * 1000  # 5 min — launch status moves faster than cadence stats
+_LL2_DISK = Path(__file__).resolve().parent / ".ll2-cache.json"
 _ll2_mem = {"at": 0, "upcoming": [], "previous": [], "previousOk": False, "agency": None}
+_ll2_lock = threading.Lock()
 
 
-def _ll2_json(url):
+def _ll2_load_disk():
+    try:
+        if not _LL2_DISK.is_file():
+            return
+        data = json.loads(_LL2_DISK.read_text("utf-8"))
+        if not (data.get("upcoming") or []):
+            return
+        _ll2_mem.update(
+            {
+                "at": int(data.get("at") or 0),
+                "upcoming": data.get("upcoming") or [],
+                "previous": data.get("previous") or [],
+                "previousOk": bool(data.get("previousOk")),
+                "agency": data.get("agency"),
+            }
+        )
+        sys.stderr.write(
+            "ll2 disk cache loaded (%d upcoming)\n" % len(_ll2_mem["upcoming"])
+        )
+    except Exception as err:
+        sys.stderr.write("ll2 disk load failed: %s\n" % err)
+
+
+def _ll2_save_disk():
+    try:
+        payload = {
+            "at": _ll2_mem["at"],
+            "upcoming": _ll2_mem["upcoming"],
+            "previous": _ll2_mem["previous"],
+            "previousOk": _ll2_mem["previousOk"],
+            "agency": _ll2_mem["agency"],
+        }
+        _LL2_DISK.write_text(json.dumps(payload), encoding="utf-8")
+    except Exception as err:
+        sys.stderr.write("ll2 disk save failed: %s\n" % err)
+
+
+_ll2_load_disk()
+
+
+def _ll2_json(url, timeout=45):
     req = Request(
         url,
         headers={
@@ -190,7 +258,7 @@ def _ll2_json(url):
             "Accept": "application/json",
         },
     )
-    with urlopen(req, timeout=20) as res:
+    with urlopen(req, timeout=timeout) as res:
         return json.loads(res.read().decode("utf-8"))
 
 
@@ -212,49 +280,81 @@ def fetch_ll2_bundle():
     from urllib.parse import quote
 
     now = int(time.time() * 1000)
-    if (
-        _ll2_mem["at"]
-        and now - _ll2_mem["at"] < LL2_CACHE_MS
-        and _ll2_mem["upcoming"]
-    ):
-        return _ll2_mem
-    y0 = "%d-01-01T00:00:00Z" % datetime.datetime.utcnow().year
-    up = _ll2_json(
-        LL2
-        + "/launch/upcoming/?lsp__id=121&limit=40&mode=detailed&ordering=net"
-    )
-    upcoming = up.get("results") or []
-    previous = _ll2_mem["previous"] or []
-    previous_ok = False
-    try:
-        qprev = (
-            LL2
-            + "/launch/previous/?lsp__id=121&net__gte="
-            + quote(y0)
-            + "&limit=100&mode=detailed&ordering=-net"
-        )
-        previous = _ll2_paged(qprev, 4)
-        previous_ok = True
-    except Exception as err:
-        sys.stderr.write("ll2 previous failed: %s\n" % err)
-        previous_ok = bool(_ll2_mem["previousOk"] and _ll2_mem["previous"])
+    with _ll2_lock:
+        if (
+            _ll2_mem["at"]
+            and now - _ll2_mem["at"] < LL2_CACHE_MS
+            and _ll2_mem["upcoming"]
+        ):
+            return dict(_ll2_mem)
+        y0 = "%d-01-01T00:00:00Z" % datetime.datetime.utcnow().year
+        try:
+            up = _ll2_json(
+                LL2
+                + "/launch/upcoming/?lsp__id=121&limit=20&mode=detailed&ordering=net"
+            )
+            upcoming = up.get("results") or []
+        except Exception as err:
+            sys.stderr.write("ll2 upcoming failed: %s\n" % err)
+            if _ll2_mem["upcoming"]:
+                stale = dict(_ll2_mem)
+                stale["stale"] = True
+                return stale
+            raise
         previous = _ll2_mem["previous"] or []
-    agency = _ll2_mem["agency"]
-    try:
-        agency = _ll2_json(LL2 + "/agencies/121/")
-    except Exception as err:
-        sys.stderr.write("ll2 agency failed: %s\n" % err)
+        previous_ok = False
+        try:
+            qprev = (
+                LL2
+                + "/launch/previous/?lsp__id=121&net__gte="
+                + quote(y0)
+                + "&limit=50&mode=detailed&ordering=-net"
+            )
+            previous = _ll2_paged(qprev, 3)
+            previous_ok = True
+        except Exception as err:
+            sys.stderr.write("ll2 previous failed: %s\n" % err)
+            previous_ok = bool(_ll2_mem["previousOk"] and _ll2_mem["previous"])
+            previous = _ll2_mem["previous"] or []
         agency = _ll2_mem["agency"]
-    _ll2_mem.update(
-        {
-            "at": now,
-            "upcoming": upcoming,
-            "previous": previous,
-            "previousOk": previous_ok,
-            "agency": agency,
-        }
-    )
-    return _ll2_mem
+        try:
+            agency = _ll2_json(LL2 + "/agencies/121/")
+        except Exception as err:
+            sys.stderr.write("ll2 agency failed: %s\n" % err)
+            agency = _ll2_mem["agency"]
+        _ll2_mem.update(
+            {
+                "at": now,
+                "upcoming": upcoming,
+                "previous": previous,
+                "previousOk": previous_ok,
+                "agency": agency,
+            }
+        )
+        _ll2_save_disk()
+        return dict(_ll2_mem)
+
+
+def _hold_client_open(handler, seconds=120):
+    """Upstream LL2/NASDAQ can exceed Handler.timeout — don't drop the phone mid-fetch."""
+    sock = getattr(handler, "connection", None)
+    old = None
+    if sock is not None:
+        try:
+            old = sock.gettimeout()
+            sock.settimeout(seconds)
+        except Exception:
+            old = None
+    return sock, old
+
+
+def _restore_client_timeout(sock, old):
+    if sock is None or old is None:
+        return
+    try:
+        sock.settimeout(old)
+    except Exception:
+        pass
 
 
 STARLINK_COUNT_URL = "https://keeptrack.space/starlink-satellite-count"
@@ -318,18 +418,20 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         path = self.path.split("?", 1)[0]
         if path == "/api/ll2" or path == "/api/ll2/":
+            sock, old_to = _hold_client_open(self, 120)
             try:
                 b = fetch_ll2_bundle()
-                body = json.dumps(
-                    {
-                        "ok": True,
-                        "at": b["at"],
-                        "upcoming": b["upcoming"],
-                        "previous": b["previous"],
-                        "previousOk": b["previousOk"],
-                        "agency": b["agency"],
-                    }
-                ).encode("utf-8")
+                payload = {
+                    "ok": True,
+                    "at": b["at"],
+                    "upcoming": b["upcoming"],
+                    "previous": b["previous"],
+                    "previousOk": b["previousOk"],
+                    "agency": b["agency"],
+                }
+                if b.get("stale"):
+                    payload["stale"] = True
+                body = json.dumps(payload).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json; charset=utf-8")
                 self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
@@ -337,14 +439,31 @@ class Handler(SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(body)
             except Exception as err:
-                body = json.dumps({"ok": False, "error": str(err)}).encode("utf-8")
-                self.send_response(502)
+                if _ll2_mem["upcoming"]:
+                    body = json.dumps(
+                        {
+                            "ok": True,
+                            "at": _ll2_mem["at"],
+                            "upcoming": _ll2_mem["upcoming"],
+                            "previous": _ll2_mem["previous"],
+                            "previousOk": _ll2_mem["previousOk"],
+                            "agency": _ll2_mem["agency"],
+                            "stale": True,
+                        }
+                    ).encode("utf-8")
+                    self.send_response(200)
+                else:
+                    body = json.dumps({"ok": False, "error": str(err)}).encode("utf-8")
+                    self.send_response(502)
                 self.send_header("Content-Type", "application/json; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
+            finally:
+                _restore_client_timeout(sock, old_to)
             return
         if path == "/api/starlink" or path == "/api/starlink/":
+            sock, old_to = _hold_client_open(self, 60)
             try:
                 b = fetch_starlink_count()
                 body = json.dumps(
@@ -380,8 +499,11 @@ class Handler(SimpleHTTPRequestHandler):
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
+            finally:
+                _restore_client_timeout(sock, old_to)
             return
         if path == "/api/spcx" or path == "/api/spcx/":
+            sock, old_to = _hold_client_open(self, 60)
             try:
                 quote = fetch_spcx_quote()
                 if not quote:
@@ -402,6 +524,8 @@ class Handler(SimpleHTTPRequestHandler):
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
+            finally:
+                _restore_client_timeout(sock, old_to)
             return
         # Explicit PNG touch-icon responses — iOS is picky about probes
         if path.startswith("/apple-touch-icon") or path in (

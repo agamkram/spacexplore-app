@@ -194,8 +194,16 @@
     }
 
     if (pastMs > 90 * 1000 && !/go|hold|tbc|tbd/.test(st)) return "last";
-    /* Stuck "Go" long after NET → treat as last until LL2 rolls next */
-    if (pastMs > 20 * 60 * 1000 && /go/.test(st)) return "last";
+    /*
+     * LL2 often lags "In flight" after liftoff. A still-Go NET that just
+     * passed is almost always ascending — show In flight, not a stuck Next.
+     */
+    if (pastMs > 90 * 1000 && pastMs <= 3 * 3600 * 1000 && /go/.test(st)) {
+      return "inflight";
+    }
+    if (pastMs > 3 * 3600 * 1000 && /go/.test(st)) return "last";
+    /* Stale seed / TBC left sitting days past NET */
+    if (pastMs > 6 * 3600 * 1000 && /tbc|tbd/.test(st)) return "last";
     return "next";
   }
 
@@ -2068,12 +2076,29 @@
       });
   }
 
+  function nearLaunchRefreshMs() {
+    /* During a live window, poll often; server cache still coalesces LL2. */
+    try {
+      const programs = (DATA && DATA.programs) || {};
+      const now = Date.now();
+      for (const id of ORDER) {
+        const n = programs[id] && programs[id].next;
+        const net = n && n.net ? new Date(n.net).getTime() : NaN;
+        if (!Number.isFinite(net)) continue;
+        if (Math.abs(now - net) < 6 * 3600 * 1000) return 90 * 1000;
+      }
+    } catch (_) {}
+    return 5 * 60 * 1000;
+  }
+
   function scheduleLiveRefresh() {
     if (liveRefreshTimer) window.clearInterval(liveRefreshTimer);
-    /* Align with live.js CACHE_MS (~12 min) */
-    liveRefreshTimer = window.setInterval(function () {
-      pullLive("interval");
-    }, 12 * 60 * 1000);
+    const tick = function () {
+      pullLive("interval").then(function () {
+        scheduleLiveRefresh();
+      });
+    };
+    liveRefreshTimer = window.setTimeout(tick, nearLaunchRefreshMs());
   }
 
   /* Always show desk even if later code throws */

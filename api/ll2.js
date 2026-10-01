@@ -4,7 +4,7 @@
  */
 const LL2 = "https://ll.thespacedevs.com/2.2.0";
 const LSP = 121;
-const CACHE_MS = 12 * 60 * 1000;
+const CACHE_MS = 5 * 60 * 1000;
 
 let mem = {
   at: 0,
@@ -46,14 +46,14 @@ async function loadFresh() {
     LL2 +
     "/launch/upcoming/?lsp__id=" +
     LSP +
-    "&limit=40&mode=detailed&ordering=net";
+    "&limit=20&mode=detailed&ordering=net";
   const qPrevious =
     LL2 +
     "/launch/previous/?lsp__id=" +
     LSP +
     "&net__gte=" +
     encodeURIComponent(y0) +
-    "&limit=100&mode=detailed&ordering=-net";
+    "&limit=50&mode=detailed&ordering=-net";
   const qAgency = LL2 + "/agencies/" + LSP + "/";
 
   const up = await getJson(qUpcoming);
@@ -62,7 +62,7 @@ async function loadFresh() {
   let previous = mem.previous || [];
   let previousOk = false;
   try {
-    previous = await fetchPaged(qPrevious, 4);
+    previous = await fetchPaged(qPrevious, 3);
     previousOk = true;
   } catch (_) {
     previousOk = !!(mem.previousOk && mem.previous && mem.previous.length);

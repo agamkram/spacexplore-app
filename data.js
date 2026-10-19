@@ -7,16 +7,19 @@ window.SPACEHUB_DATA = {
   fleetGoal: 145,
   fleetYtd: 108,
   lastUpdated: "2026-09-11T22:00:00Z",
-  sitesRev: 38,
+  sitesRev: 46,
 
   /*
-   * SpaceX site atlas — lat/lon checked against public maps / commonly cited pad coords.
+   * SpaceXAI / SPCX site atlas — lat/lon from public maps, OSM, Census, city filings.
    * Pin = facility center (not gate GPS). Unofficial · not survey-grade.
    * Brownsville city center removed (was wrong — Starbase is ~17 mi east at Boca Chica).
    * Jul 2026 verify: user LZ-4 + Starbase Pad 2 / production / Massey's; other pins
    * cross-checked vs Falcon UG, Wikipedia/Wikidata, OSM, TCEQ where available.
    * Aug 2026: Starbase Louisiana (Pecan Island) — planned; pin is coastal marsh
    * south of the Hwy 82 community (no pad survey yet).
+   * Oct 2026 (post-merger): Palo Alto AI, Memphis/Southaven Colossus, Grimes Terafab,
+   * Port of Brownsville 444-acre, Woodinville, Sunnyvale, Bloomfield, Canandaigua,
+   * Bellevue AI, London AI, Dublin Starlink EU. Gateways / leased colo not pinned.
    */
   sites: [
     /* ── California ── */
@@ -46,6 +49,45 @@ window.SPACEHUB_DATA = {
       lon: -122.03523,
       blurb:
         "Starlink manufacturing and engineering in Redmond, WA (Redmond Ridge / NE Alder Crest) — satellites and related hardware (not a public gateway farm).",
+    },
+    {
+      id: "woodinville",
+      name: "Woodinville · Starlink",
+      kind: "starlink",
+      lat: 47.79557,
+      lon: -122.1263,
+      blurb:
+        "8131 W Bostian Rd, Woodinville, WA — Starlink industrial / warehouse campus (LogistiCenter) beside the Redmond satellite factory belt. Machining, aviation hardware, and ops support.",
+    },
+    {
+      id: "bellevue",
+      name: "Bellevue · AI",
+      kind: "ai",
+      /* Lincoln Square South, 10400 NE 4th St Fl 8 — xAI Seattle-area engineering hub */
+      lat: 47.61425,
+      lon: -122.20072,
+      blurb:
+        "10400 NE 4th St (Lincoln Square South), Bellevue, WA — SpaceXAI Seattle-area AI engineering office (~25k sq ft, former Epic Games floor). Listed as Seattle on x.ai/company; distinct from Redmond Starlink.",
+    },
+    {
+      id: "sunnyvale",
+      name: "Sunnyvale · Starlink",
+      kind: "starlink",
+      /* Job postings: 390 W Java Dr (not Lockheed Martin Way). Census address match. */
+      lat: 37.41209,
+      lon: -122.02081,
+      blurb:
+        "390 West Java Drive, Sunnyvale, CA — Starlink network / software engineering office (SpaceX job-listing address). Not the Lockheed Martin campus.",
+    },
+    {
+      id: "palo-alto",
+      name: "Palo Alto · AI",
+      kind: "ai",
+      /* 1450 Page Mill building center (MapQuest / listings); Nominatim house pin was ~160 m S */
+      lat: 37.41626,
+      lon: -122.14897,
+      blurb:
+        "1450 Page Mill Rd campus (also 1510 / 1530 Page Mill), Palo Alto — SpaceXAI advanced AI research and Grok engineering. Official spacex.com/sites listing post-merger.",
     },
     {
       id: "slc4e",
@@ -102,6 +144,27 @@ window.SPACEHUB_DATA = {
         "Irvine, CA — Starshield national-security programs office (historically 96 Corporate Park). Classified / government constellation work distinct from consumer Starlink.",
     },
 
+    /* ── Connecticut / New York ── */
+    {
+      id: "bloomfield",
+      name: "Bloomfield · soft goods",
+      kind: "build",
+      /* ArcGIS address match 131 Phoenix Xing (was street-centerline ~350 m E in the road) */
+      lat: 41.8654,
+      lon: -72.71289,
+      blurb:
+        "131 Phoenix Crossing (Phoenix Xing), Bloomfield, CT — parachutes and soft goods (Starfall / Dragon / Starship / Starlink). Former Pioneer Aerospace site.",
+    },
+    {
+      id: "canandaigua",
+      name: "Canandaigua · RF filters",
+      kind: "build",
+      lat: 42.9237,
+      lon: -77.31232,
+      blurb:
+        "5450 Campus Drive, Canandaigua, NY — former Akoustis BAW RF-filter wafer fab, acquired 2025 by SpaceX (Tune Holdings). Starlink / RF manufacturing.",
+    },
+
     /* ── Texas · Starbase (Boca Chica) ── */
     {
       /* Coords from Google Maps (user) */
@@ -139,7 +202,21 @@ window.SPACEHUB_DATA = {
       lat: 25.9520417,
       lon: -97.2497528,
       blurb:
-        "Massey's — tank, structural, and engine-related testing west of the main Starbase production strip.",
+        "Massey's (1 Massey Way) — cryo proof, structural, and ship static-fire testing west of the Starbase production strip. Rebuilt after the June 2025 Ship 36 anomaly.",
+    },
+    {
+      id: "massey-2",
+      name: "Massey's 2",
+      kind: "test",
+      /*
+       * TCEQ “Starbase Massey 2” at 1 Massey Way (~46 acres construction, active Oct 2026).
+       * Eastward expansion of the original Massey’s complex (not a separate campus).
+       * Pin just east of OSM “Starbase Structural Test Site” footprint — approximate.
+       */
+      lat: 25.9515,
+      lon: -97.247,
+      blurb:
+        "Starbase Massey 2 — TCEQ-listed expansion at 1 Massey Way (~46 acres). Eastward build-out of the Massey’s test complex (clearing underway Oct 2026). Same road address as Massey’s; pin is approximate east of the original structural-test footprint.",
     },
     {
       id: "mcgregor",
@@ -158,6 +235,81 @@ window.SPACEHUB_DATA = {
       lon: -97.4061886,
       blurb:
         "Starlink manufacturing hub near Austin (858 FM 1209, Bastrop County) — satellites, user terminals, and electronics.",
+    },
+    {
+      /*
+       * East of Brownsville landfill along South Connector / port corridor.
+       * Landfill ~25.939, −97.422; Port of Brownsville ~25.951, −97.411.
+       * Tract center is approximate — not a surveyed parcel centroid.
+       */
+      id: "brownsville-444",
+      name: "Port Brownsville · 444 acres",
+      kind: "build",
+      /*
+       * OSM Brownsville Landfill centroid ~25.936, −97.386 (east edge ~−97.378).
+       * Tract is east of landfill on South Connector — pin just east of that edge.
+       * Still approximate (no surveyed parcel centroid published).
+       */
+      lat: 25.9375,
+      lon: -97.372,
+      blurb:
+        "~444-acre SpaceX tract along South Connector Road, east of the Brownsville landfill near the Port of Brownsville. Disannexed from Brownsville Aug 2026 (~$220M water deal), annexed by Starbase. Not for launches or rocket testing — port-side industrial / logistics (data-center speculation continues). Pin is approximate, just east of the landfill OSM footprint.",
+    },
+    {
+      id: "terafab",
+      name: "Terafab · Grimes County",
+      kind: "build",
+      /* Former Gibbons Creek Steam Electric Station industrial pad (OSM) — county filings cite this site */
+      lat: 30.61795,
+      lon: -96.08137,
+      blurb:
+        "Terafab — planned SpaceX semiconductor / advanced-computing fab at Gibbons Creek Reservoir (former steam plant), Grimes County, TX. Off Hwy 30 east of Bryan–College Station. Multi-phase build; pin is the old plant industrial footprint.",
+    },
+
+    /* ── Mid-South · Colossus (SpaceXAI compute) ── */
+    {
+      id: "colossus1",
+      name: "Colossus 1 · Memphis",
+      kind: "compute",
+      /* OSM building “xAI Colossus” — street geocode was ~400 m east of the plant */
+      lat: 35.06008,
+      lon: -90.15638,
+      blurb:
+        "3231 Paul R. Lowry Rd, Memphis (former Electrolux) — Colossus 1 AI training cluster. Official Mid-South SpaceXAI compute campus.",
+    },
+    {
+      id: "colossus2",
+      name: "Colossus 2 · Macrohard",
+      kind: "compute",
+      /* OSM building “xAI Macrohard Colossus 2” */
+      lat: 34.99798,
+      lon: -90.03487,
+      blurb:
+        "5420 Tulane Rd, Memphis — Colossus 2 / Macrohard AI training cluster (Whitehaven). Gigawatt-scale expansion of the Mid-South campus.",
+    },
+    {
+      id: "minihard",
+      name: "Minihard · Tulane",
+      kind: "compute",
+      /*
+       * 5414 Tulane Rd — fourth Mid-South data center, adjacent to Colossus 2.
+       * No separate OSM building footprint yet; pin sits on the Colossus 2 industrial
+       * landuse just west of the Macrohard building (not the Southaven power plant).
+       */
+      lat: 34.99722,
+      lon: -90.03719,
+      blurb:
+        "5414 Tulane Rd, Memphis — Minihard, SpaceXAI’s fourth Mid-South AI data center next to Colossus 2 / Macrohard. Pin is approximate campus area until a building footprint is mapped.",
+    },
+    {
+      id: "macrohardrr",
+      name: "Macrohardrr · Southaven",
+      kind: "compute",
+      /* OSM building “xAI Macrohardrr” — former GXO warehouse at 2400 Stateline Rd W */
+      lat: 34.99349,
+      lon: -90.03417,
+      blurb:
+        "2400 Stateline Rd W, Southaven, MS — Macrohardrr (~810k sq ft former GXO warehouse). SpaceXAI data center next to the old Duke/Stanton power site (plant itself not pinned). Part of the Mid-South Colossus cluster.",
     },
 
     /* ── Louisiana · Starbase (Pecan Island) — announced 25 Aug 2026 ── */
@@ -288,6 +440,26 @@ window.SPACEHUB_DATA = {
       lon: -77.02781,
       blurb:
         "National capital office (1155 F St NW) for government customers, licensing, and policy engagement.",
+    },
+    {
+      id: "london",
+      name: "London · AI",
+      kind: "ai",
+      /* X.AI London Ltd / SpaceXSI — 20 Air Street, Soho */
+      lat: 51.5106,
+      lon: -0.13662,
+      blurb:
+        "20 Air Street, Soho, London W1B 5AN — SpaceXAI UK engineering / infrastructure office (near Piccadilly Circus). One of four offices named on x.ai/company.",
+    },
+    {
+      id: "dublin",
+      name: "Dublin · Starlink EU",
+      kind: "starlink",
+      /* Starlink Internet Services Limited — Miesian Plaza */
+      lat: 53.33646,
+      lon: -6.24726,
+      blurb:
+        "Floor 3, Block 3, Miesian Plaza, Dublin 2 — Starlink’s EU legal / network ops entity (Starlink Internet Services Limited). SpaceXAI / Starlink hiring site for network software and ops.",
     },
 
     /*

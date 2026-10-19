@@ -388,6 +388,8 @@
     gateway: "Starlink gateway",
     tracking: "Tracking / ground",
     office: "Office",
+    ai: "AI / research",
+    compute: "Compute / data center",
   };
 
 

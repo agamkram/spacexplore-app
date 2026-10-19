@@ -86,26 +86,25 @@ html.pwa-standalone .fit-stage {
   height: calc(var(--pwa-fill-h, 100%) + var(--pwa-extra-b, 0px));
   min-height: calc(var(--pwa-fill-h, 100%) + var(--pwa-extra-b, 0px));
   overscroll-behavior: none;
-  padding-top: max(54px, env(safe-area-inset-top, 0px));
 }
 
 /*
- * Home-screen status bar fades whatever is under it unless a solid fixed
- * bar sits on the top edge (at least 6px tall, nearly full width, top within 4px).
- * A zero-height strip does not count.
+ * Phone home screen draws a fade over the top unless it finds a fixed bar
+ * on that edge. Hidden or zero-height does not count. Clipped so it does not
+ * paint a black band; the system still reads the background color.
  */
-.status-bar { display: none; }
-
-html.pwa-standalone .status-bar {
-  display: block;
+.status-bar {
   position: fixed;
   top: 0;
   left: 0;
+  right: 0;
   width: 100%;
-  height: max(54px, env(safe-area-inset-top, 0px));
-  background-color: #000000;
-  z-index: 10000;
+  height: 11px;
+  z-index: 2147483647;
   pointer-events: none;
+  background-color: #000000;
+  -webkit-background-clip: text;
+  background-clip: text;
 }
 
 .fit-stage > .app {

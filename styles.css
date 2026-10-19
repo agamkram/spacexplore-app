@@ -1,5 +1,6 @@
 :root {
-  --bg: #04060a;
+  /* Pure black — matches theme-color; avoids frosted mismatch under status glass */
+  --bg: #000000;
   --bg2: #0a1018;
   --cell: rgba(16, 22, 32, 0.25);
   --cell-hi: rgba(24, 32, 44, 0.25);
@@ -30,7 +31,6 @@ html, body {
   overflow: hidden;
   overflow-x: hidden;
   overscroll-behavior: none;
-  /* Match chrome — pure #000 gaps on iOS Safari read as black bars (Bubblin). */
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
@@ -53,9 +53,23 @@ html.pwa-standalone body {
 }
 
 /*
- * Bubblin shell: edge-to-edge. Safari = inset 0.
- * Safe-area lives INSIDE header / media — not empty stage padding.
+ * PWA + black-translucent: iOS status glass blurs whatever sits under the
+ * notch. A fixed opaque slab (viewport top, high z) is the solid paint it
+ * needs — header padding alone is not enough when layers composite.
  */
+html.pwa-standalone body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--safe-t);
+  background: var(--bg);
+  z-index: 10000;
+  pointer-events: none;
+}
+
+/* Edge-to-edge shell. Safari inset 0; PWA fillH below. */
 .fit-stage {
   position: fixed;
   top: 0;
@@ -70,7 +84,6 @@ html.pwa-standalone body {
   align-items: stretch;
   justify-content: stretch;
   overflow: hidden;
-  /* Intentional flat black — same as theme-color. No starfield layer. */
   background: var(--bg);
   padding: 0;
   box-sizing: border-box;
@@ -126,15 +139,12 @@ html.pwa-standalone .fit-stage {
   opacity: 1;
 }
 
-/*
- * Header = Bubblin topbar: opaque bg + safe-area pad INSIDE
- * so black-translucent status glass sits on solid paint (no soft blur).
- */
+/* Title clears the notch; safe-area pad is inside this chrome. */
 .app-header {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: calc(0.28in + 15px);
+  min-height: calc(0.28in + 15px + var(--safe-t));
   padding: calc(4px + var(--safe-t)) 6px 4px;
   flex-shrink: 0;
   min-width: 0;
@@ -391,7 +401,7 @@ html.pwa-standalone .fit-stage {
   padding: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #04060a;
+  background: #000000;
   overflow: hidden;
   cursor: pointer;
   flex-shrink: 0;
@@ -431,7 +441,7 @@ html.pwa-standalone .fit-stage {
 
 /* Leaflet — dark OSM basemap (accurate shore) + light white borders */
 .leaflet-container {
-  background: #04060a !important;
+  background: #000000 !important;
   font-family: var(--font);
   width: 100%;
   height: 100%;
@@ -586,7 +596,7 @@ html.pwa-standalone .fit-stage {
   min-height: 0;
   width: 100%;
   height: 100%;
-  background: #04060a;
+  background: #000000;
   position: relative;
   z-index: 0;
 }
@@ -1226,7 +1236,7 @@ html.pwa-standalone .fit-stage {
   white-space: nowrap;
 }
 
-/* —— Media / X —— safe-area inside last band with opaque paint (Bubblin tray) —— */
+/* —— Media / X —— safe-area inside last band with opaque paint —— */
 .media-band {
   min-height: 0;
   min-width: 0;
@@ -1438,7 +1448,7 @@ dialog.sheet[open] {
   appearance: none;
 }
 
-/* —— Phone: fluid full-bleed (Bubblin — no stage padding, no VV box) —— */
+/* —— Phone: fluid full-bleed (no stage padding, no VV box) —— */
 @media (max-width: 500px), ((max-height: 500px) and (pointer: coarse)) {
   .fit-stage,
   .fit-stage.fit-stage--fluid,

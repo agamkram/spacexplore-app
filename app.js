@@ -1288,7 +1288,7 @@
       minZoom: 0,
       maxZoom: 18,
     });
-    map.getContainer().style.background = "#04060a";
+    map.getContainer().style.background = "#000000";
     map.setMaxBounds(worldBounds);
     /* Real shorelines from OSM via CARTO dark (not satellite) */
     Lref.tileLayer(MAP_TILE_URL, {
@@ -1625,12 +1625,12 @@
   }
 
   /**
-   * Viewport fit — BubblinCrude (Leaflet + chrome):
+   * Viewport fit:
    * - Safari tab: shell inset 0. Never VV offsetTop/Left (black bars).
    * - PWA A2HS: Bug B fillH. Safe-area inside header/media, not stage padding.
    */
   function isStandaloneShell() {
-    /* Bubblin: do not treat minimal-ui as PWA — flaky on iOS Safari. */
+    /* Do not treat minimal-ui as PWA — flaky on iOS Safari. */
     return (
       window.matchMedia("(display-mode: standalone)").matches ||
       window.matchMedia("(display-mode: fullscreen)").matches ||

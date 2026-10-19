@@ -1718,78 +1718,6 @@
     stage.style.inset = "";
   }
 
-  /* —— Starfield (full stage, paints into former strip) —— */
-  let stars = [];
-  let starRaf = 0;
-
-  function seedStars(w, h) {
-    const count = Math.min(220, Math.max(90, Math.floor((w * h) / 2800)));
-    stars = [];
-    for (let i = 0; i < count; i++) {
-      stars.push({
-        x: Math.random() * w,
-        y: Math.random() * h,
-        r: Math.random() < 0.12 ? 1.35 : Math.random() < 0.4 ? 0.9 : 0.55,
-        a: 0.25 + Math.random() * 0.7,
-        tw: Math.random() * Math.PI * 2,
-        sp: 0.4 + Math.random() * 1.2,
-      });
-    }
-  }
-
-  function paintStarfield() {
-    const canvas = document.getElementById("starfield");
-    const stage = document.getElementById("fit-stage");
-    if (!canvas || !stage) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.max(1, Math.round(stage.clientWidth));
-    const h = Math.max(1, Math.round(stage.clientHeight));
-    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
-      canvas.width = Math.round(w * dpr);
-      canvas.height = Math.round(h * dpr);
-      canvas.style.width = w + "px";
-      canvas.style.height = h + "px";
-      seedStars(w, h);
-    }
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    /* Flat fill only — soft glow under black-translucent = PWA top blur. */
-    ctx.fillStyle = "#04060a";
-    ctx.fillRect(0, 0, w, h);
-    const t = performance.now() * 0.001;
-    for (let i = 0; i < stars.length; i++) {
-      const s = stars[i];
-      const tw = 0.55 + 0.45 * Math.sin(t * s.sp + s.tw);
-      ctx.beginPath();
-      ctx.fillStyle = "rgba(220,230,255," + (s.a * tw).toFixed(3) + ")";
-      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  function loopStars() {
-    if (document.visibilityState === "hidden") {
-      starRaf = 0;
-      return;
-    }
-    paintStarfield();
-    if (
-      window.matchMedia &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
-      starRaf = 0;
-      return;
-    }
-    starRaf = requestAnimationFrame(loopStars);
-  }
-
-  function ensureStarLoop() {
-    if (starRaf) return;
-    if (document.visibilityState === "hidden") return;
-    loopStars();
-  }
-
   let fitRaf = 0;
   let lastFitKey = "";
   let hasRevealed = false;
@@ -1837,10 +1765,8 @@
         stage.clientHeight;
       if (fitKey !== lastFitKey) {
         lastFitKey = fitKey;
-        seedStars(stage.clientWidth, stage.clientHeight);
         fitDenseLines(true);
       }
-      paintStarfield();
       revealApp();
       return;
     }
@@ -1882,7 +1808,6 @@
       sh;
     if (fitKey !== lastFitKey) {
       lastFitKey = fitKey;
-      seedStars(sw, sh);
       fitDenseLines(true);
     }
 
@@ -1894,7 +1819,6 @@
       appEl.style.zoom = "";
       appEl.style.transform = "scale(" + scale + ")";
     }
-    paintStarfield();
     revealApp();
   }
 
@@ -1911,7 +1835,6 @@
   function initFit() {
     if (isStandaloneShell()) syncPwaFillHeight();
     scheduleFit();
-    loopStars();
     window.addEventListener("resize", scheduleFit);
     window.addEventListener("orientationchange", () => {
       setTimeout(scheduleFit, 50);
@@ -1922,10 +1845,7 @@
     window.matchMedia("(display-mode: standalone)").addEventListener?.("change", scheduleFit);
     window.addEventListener("pageshow", scheduleFit);
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") {
-        scheduleFit();
-        ensureStarLoop();
-      }
+      if (document.visibilityState === "visible") scheduleFit();
     });
     /* DM Sans / Plex — wait, then fit once (avoids Mac big→small on font swap) */
     if (document.fonts && document.fonts.ready) {

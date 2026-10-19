@@ -70,7 +70,7 @@ html.pwa-standalone body {
   align-items: stretch;
   justify-content: stretch;
   overflow: hidden;
-  /* Flat match to theme-color — gradients under status glass read as blur (Bubblin). */
+  /* Intentional flat black — same as theme-color. No starfield layer. */
   background: var(--bg);
   padding: 0;
   box-sizing: border-box;
@@ -88,21 +88,12 @@ html.pwa-standalone .fit-stage {
   overscroll-behavior: none;
 }
 
-.starfield {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  pointer-events: none;
-  z-index: 0;
-}
-
 .fit-stage > .app {
   position: relative;
   z-index: 1;
   flex: 1 1 auto;
   min-height: 0;
+  background: var(--bg);
 }
 
 .app {
@@ -136,8 +127,8 @@ html.pwa-standalone .fit-stage {
 }
 
 /*
- * Header = Bubblin topbar: opaque bg + safe-area pad INSIDE.
- * Transparent header over starfield under black-translucent = PWA top blur.
+ * Header = Bubblin topbar: opaque bg + safe-area pad INSIDE
+ * so black-translucent status glass sits on solid paint (no soft blur).
  */
 .app-header {
   display: flex;

@@ -86,6 +86,26 @@ html.pwa-standalone .fit-stage {
   height: calc(var(--pwa-fill-h, 100%) + var(--pwa-extra-b, 0px));
   min-height: calc(var(--pwa-fill-h, 100%) + var(--pwa-extra-b, 0px));
   overscroll-behavior: none;
+  padding-top: max(54px, env(safe-area-inset-top, 0px));
+}
+
+/*
+ * Home-screen status bar fades whatever is under it unless a solid fixed
+ * bar sits on the top edge (at least 6px tall, nearly full width, top within 4px).
+ * A zero-height strip does not count.
+ */
+.status-bar { display: none; }
+
+html.pwa-standalone .status-bar {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: max(54px, env(safe-area-inset-top, 0px));
+  background-color: #000000;
+  z-index: 10000;
+  pointer-events: none;
 }
 
 .fit-stage > .app {

@@ -88,25 +88,6 @@ html.pwa-standalone .fit-stage {
   overscroll-behavior: none;
 }
 
-/*
- * Phone home screen draws a fade over the top unless it finds a fixed bar
- * on that edge. Hidden or zero-height does not count. Clipped so it does not
- * paint a black band; the system still reads the background color.
- */
-.status-bar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  width: 100%;
-  height: 11px;
-  z-index: 2147483647;
-  pointer-events: none;
-  background-color: #000000;
-  -webkit-background-clip: text;
-  background-clip: text;
-}
-
 .fit-stage > .app {
   position: relative;
   z-index: 1;
@@ -1522,6 +1503,25 @@ dialog.sheet[open] {
 
   .sheet-inner {
     padding: 8px 10px;
+  }
+}
+
+/*
+ * Home screen fades the top of the page. The status inset often comes back
+ * as 0, so the title and Back sat in that fade. Move the whole board down
+ * by a fixed amount. The fade then only covers the black.
+ */
+@media (max-width: 500px), ((max-height: 500px) and (pointer: coarse)) {
+  html.pwa-standalone .fit-stage,
+  html.pwa-standalone .fit-stage.fit-stage--fluid,
+  html.pwa-standalone .fit-stage.fit-stage--standalone {
+    padding-top: 96px;
+  }
+}
+
+@media (display-mode: standalone) and (max-width: 500px) {
+  .fit-stage {
+    padding-top: 96px;
   }
 }
 

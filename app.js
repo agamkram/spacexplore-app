@@ -1288,7 +1288,7 @@
       minZoom: 0,
       maxZoom: 18,
     });
-    map.getContainer().style.background = "#000000";
+    map.getContainer().style.background = "#04060a";
     map.setMaxBounds(worldBounds);
     /* Real shorelines from OSM via CARTO dark (not satellite) */
     Lref.tileLayer(MAP_TILE_URL, {
@@ -1625,12 +1625,13 @@
   }
 
   /**
-   * Viewport fit:
-   * - Safari tab: shell inset 0. Never VV offsetTop/Left (black bars).
-   * - PWA A2HS: Bug B fillH. Safe-area inside header/media, not stage padding.
+   * Viewport fit
+   * - Safari tab (phone + iPad): pin stage to visualViewport (GovDash).
+   * - PWA A2HS (phone/iPad): Bug B — lock to screen fill height (SuperMoon).
+   *   VV alone leaves ~5/16" black under the layout box.
+   *   Never stack VV height + env(safe-area-bottom).
    */
   function isStandaloneShell() {
-    /* Do not treat minimal-ui as PWA — flaky on iOS Safari. */
     return (
       window.matchMedia("(display-mode: standalone)").matches ||
       window.matchMedia("(display-mode: fullscreen)").matches ||
@@ -1652,6 +1653,16 @@
       window.matchMedia("(pointer: coarse)").matches ||
       window.matchMedia("(hover: none)").matches
     );
+  }
+
+  /* GovDash isTouchShell — iPadOS reports Macintosh + maxTouchPoints > 1 */
+  function isCoarseTouch() {
+    const ua = navigator.userAgent || "";
+    if (/iPad|iPhone|iPod/i.test(ua)) return true;
+    if (navigator.platform === "MacIntel" && (navigator.maxTouchPoints || 0) > 1) {
+      return true;
+    }
+    return window.matchMedia("(hover: none) and (pointer: coarse)").matches;
   }
 
   function readSafeInsetBottom() {
@@ -1693,29 +1704,14 @@
       root.classList.remove("pwa-standalone");
       root.style.removeProperty("--pwa-fill-h");
       root.style.removeProperty("--pwa-extra-b");
-      root.style.removeProperty("height");
-      root.style.removeProperty("min-height");
       return 0;
     }
     root.classList.add("pwa-standalone");
     const fillH = pwaFillHeightPx();
     const extra = pwaExtraBottomPx();
-    const total = fillH + extra;
     root.style.setProperty("--pwa-fill-h", fillH + "px");
     root.style.setProperty("--pwa-extra-b", extra + "px");
-    root.style.height = total + "px";
-    root.style.minHeight = total + "px";
-    return total;
-  }
-
-  function clearStageInlineGeometry(stage) {
-    stage.style.top = "";
-    stage.style.left = "";
-    stage.style.right = "";
-    stage.style.bottom = "";
-    stage.style.width = "";
-    stage.style.height = "";
-    stage.style.inset = "";
+    return fillH + extra;
   }
 
   let fitRaf = 0;
@@ -1734,6 +1730,7 @@
     if (!stage || !appEl) return;
 
     const phone = isPhoneShell();
+    const vv = window.visualViewport;
     const standalone = isStandaloneShell();
     document.documentElement.dataset.shell = standalone ? "standalone" : "browser";
     document.documentElement.dataset.layout = phone ? "phone" : "wide";
@@ -1741,24 +1738,45 @@
     if (phone) {
       appEl.style.transform = "";
       appEl.style.zoom = "";
-      appEl.style.width = "100%";
-      appEl.style.height = "100%";
-      appEl.style.maxWidth = "none";
-      appEl.style.flex = "1 1 0";
-      appEl.style.minHeight = "0";
+      appEl.style.width = "";
+      appEl.style.height = "";
+      appEl.style.maxWidth = "";
 
       stage.classList.add("fit-stage--fluid");
       stage.classList.toggle("fit-stage--standalone", standalone);
       stage.classList.toggle("fit-stage--browser", !standalone);
-      stage.classList.remove("fit-stage--vv");
       stage.style.position = "fixed";
       stage.style.margin = "0";
-      /* CSS owns geometry: Safari inset 0, PWA fillH. Never inline VV box. */
-      clearStageInlineGeometry(stage);
-      syncPwaFillHeight();
+      stage.style.right = "auto";
+      stage.style.bottom = "auto";
+
+      if (standalone) {
+        /* Bug B: fill to screen height — not short VV/inner layout box */
+        const total = syncPwaFillHeight();
+        stage.classList.remove("fit-stage--vv");
+        stage.style.top = "0";
+        stage.style.left = "0";
+        stage.style.width = "100%";
+        stage.style.height = total > 0 ? total + "px" : "100%";
+      } else if (vv && vv.height > 0) {
+        /* Safari tab: exact visual viewport */
+        document.documentElement.classList.remove("pwa-standalone");
+        stage.classList.add("fit-stage--vv");
+        stage.style.top = Math.round(vv.offsetTop) + "px";
+        stage.style.left = Math.round(vv.offsetLeft) + "px";
+        stage.style.width = Math.round(vv.width) + "px";
+        stage.style.height = Math.round(vv.height) + "px";
+      } else {
+        stage.classList.remove("fit-stage--vv");
+        stage.style.inset = "0";
+        stage.style.width = "";
+        stage.style.height = "";
+        stage.style.top = "";
+        stage.style.left = "";
+      }
 
       const fitKey =
-        (standalone ? "pwa:" + pwaFillHeightPx() : "safari") +
+        (standalone ? "pwa:" + pwaFillHeightPx() : "vv") +
         ":" +
         stage.clientWidth +
         "x" +
@@ -1780,10 +1798,47 @@
     );
     stage.style.position = "fixed";
     stage.style.margin = "";
-    appEl.style.flex = "";
-    appEl.style.minHeight = "";
-    clearStageInlineGeometry(stage);
-    syncPwaFillHeight(); /* PWA fillH or clear — Safari stays inset:0 via CSS */
+
+    /*
+     * Bug B (Desktop Bottom:full bleed.txt): iPad PWA must keep screen
+     * fill + extraB. Removing pwa-standalone here left the ~5/16" strip.
+     */
+    if (standalone) {
+      const total = syncPwaFillHeight();
+      stage.classList.remove("fit-stage--vv");
+      stage.style.inset = "";
+      stage.style.top = "0";
+      stage.style.left = "0";
+      stage.style.right = "auto";
+      stage.style.bottom = "auto";
+      stage.style.width = "100%";
+      stage.style.height = total > 0 ? total + "px" : "100%";
+    } else if (isCoarseTouch() && vv && vv.height > 40 && vv.width > 40) {
+      /* Safari tab (iPad included): visualViewport only — copy GovDash */
+      document.documentElement.classList.remove("pwa-standalone");
+      document.documentElement.style.removeProperty("--pwa-fill-h");
+      document.documentElement.style.removeProperty("--pwa-extra-b");
+      stage.classList.add("fit-stage--vv");
+      stage.style.inset = "";
+      stage.style.top = Math.round(vv.offsetTop) + "px";
+      stage.style.left = Math.round(vv.offsetLeft) + "px";
+      stage.style.right = "auto";
+      stage.style.bottom = "auto";
+      stage.style.width = Math.round(vv.width) + "px";
+      stage.style.height = Math.round(vv.height) + "px";
+    } else {
+      document.documentElement.classList.remove("pwa-standalone");
+      document.documentElement.style.removeProperty("--pwa-fill-h");
+      document.documentElement.style.removeProperty("--pwa-extra-b");
+      stage.classList.remove("fit-stage--vv");
+      stage.style.inset = "0";
+      stage.style.top = "";
+      stage.style.left = "";
+      stage.style.right = "";
+      stage.style.bottom = "";
+      stage.style.width = "";
+      stage.style.height = "";
+    }
 
     const ART_W = 390;
     const ART_H = 844;
@@ -1801,7 +1856,9 @@
     const fitKey =
       (standalone
         ? "pwa-wide:" + pwaFillHeightPx() + "+" + pwaExtraBottomPx()
-        : "wide") +
+        : isCoarseTouch() && vv
+          ? "vv-wide:" + Math.round(vv.width) + "x" + Math.round(vv.height)
+          : "wide") +
       ":" +
       sw +
       "x" +

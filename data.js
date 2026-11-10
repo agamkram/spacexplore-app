@@ -733,20 +733,20 @@ window.SPACEHUB_DATA = {
         {
           k: "Launch pads",
           v: "4 active",
-          s: "3 under construction",
-          d: "4 active orbital launch pads: LC-39A, SLC-40, SLC-4E, Pad 2. 3 under construction or major rebuild: OLP-1 at Starbase (V3 upgrade), SLC-6 at Vandenberg (Falcon), and Florida Starship (LC-39A Ship pad path and SLC-37). Counts move as pads come online.",
+          s: "5 building / rebuild",
+          d: "4 active orbital pads today: LC-39A (Falcon), SLC-40, SLC-4E, and Starbase Pad 2. Five more building or in major rebuild: Starbase OLP-1 (V3), Vandenberg SLC-6 (Falcon), LC-39A Starship path, and two Starship pads at SLC-37. Starbase Louisiana is planned beyond that. Counts move as pads come online.",
         },
         {
           k: "Factories",
           v: "6",
           s: "build + engines",
-          d: "Hawthorne (Falcon / Dragon + Merlin), Starbase (Starship + Raptor flow), Bastrop and Redmond (Starlink sats and terminals), McGregor (engine test and Raptor production), plus the Starship factory path at Kennedy / Roberts Road.",
+          d: "Six core plants: Hawthorne (Falcon / Dragon + Merlin), Starbase (Starship + Raptor, including Gigabay), Bastrop and Redmond (Starlink), McGregor (engine test and Raptor production), and Kennedy Roberts Road (Starship Gigabay path). Soft-goods, RF, and AI compute sites sit outside this count.",
         },
         {
           k: "Workforce",
           v: "22k",
           s: "company-wide",
-          d: "About 22,000 people company-wide (public 2026 figure) across factories, pads, engineering, and Starlink — not just flight ops.",
+          d: "About 22,600 people company-wide (public 2026 figure) across factories, pads, engineering, Starlink, and SpaceXAI — not just flight ops.",
         },
         {
           k: "Recovery",
@@ -848,12 +848,12 @@ window.SPACEHUB_DATA = {
           k: "Markets",
           v: "160+",
           s: "Starlink live",
-          d: "Countries and territories with Starlink available or launched on the public map. Live desk count updates when the availability file is reachable.",
+          d: "Countries and territories with Starlink available or launched on the public availability map. Live desk count via the markets proxy when reachable.",
         },
       ],
       stats: [
-        { k: "Falcon 9", v: "87", d: "Falcon 9 orbital launches this year. Year-pace uses this plus Heavy versus the public Falcon target of 145." },
-        { k: "Falcon Heavy", v: "1", d: "Falcon Heavy flights this year. Rare by design." },
+        { k: "Falcon 9", v: "87", d: "Falcon 9 orbital launches this year (Launch Library). Year-pace uses Falcon 9 + Heavy versus the public Falcon target of 145." },
+        { k: "Falcon Heavy", v: "1", d: "Falcon Heavy flights this year. Rare by design — high-energy missions, not weekly cadence." },
         { k: "Starship", v: "2", d: "Starship integrated flight tests this year. In fleet YTD, not in the Falcon target bar." },
       ],
       media: [
@@ -985,13 +985,13 @@ window.SPACEHUB_DATA = {
           k: "Landings",
           v: "86",
           s: "recoveries YTD",
-          d: "Successful first-stage recovery attempts on Falcon flights this year — droneship or land zone. Landing is how reuse becomes inventory instead of expendable hardware.",
+          d: "Successful Falcon 9 first-stage recoveries this year — droneship or land zone. Count is successes, not attempts. Landing is how reuse becomes inventory instead of expendable hardware.",
         },
         {
           k: "East / West",
           v: "40/47",
           s: "Florida / Vandenberg",
-          d: "Split of F9 flights between Florida (Cape / Kennedy) and Vandenberg this year. East coast owns volume; west coast owns polar and high-inclination Starlink and other polar work.",
+          d: "Split of Falcon 9 flights between Florida (Cape / Kennedy) and Vandenberg this year. East coast owns volume; west coast owns polar and high-inclination Starlink and other polar work.",
         },
         {
           k: "Next landing",
@@ -1001,10 +1001,10 @@ window.SPACEHUB_DATA = {
         },
       ],
       stats: [
-        { k: "Starlink", v: "68" },
-        { k: "Other", v: "9" },
-        { k: "Rideshare", v: "4" },
-        { k: "YTD", v: "85" },
+        { k: "Starlink", v: "68", d: "Falcon 9 Starlink missions this year." },
+        { k: "Other", v: "9", d: "Falcon 9 missions this year that were not Starlink stacks." },
+        { k: "Rideshare", v: "4", d: "Transporter / Bandwagon / rideshare F9 flights this year." },
+        { k: "YTD", v: "85", d: "All Falcon 9 orbital launches this year (Launch Library)." },
       ],
       media: [
         { handle: "@SpaceX", title: "SpaceX", url: "https://x.com/SpaceX" },
@@ -1151,10 +1151,10 @@ window.SPACEHUB_DATA = {
         },
       ],
       stats: [
-        { k: "YTD", v: "1" },
-        { k: "Year target", v: "4" },
-        { k: "Landings", v: "—" },
-        { k: "Pad", v: "39A" },
+        { k: "YTD", v: "1", d: "Falcon Heavy flights this year." },
+        { k: "Year target", v: "4", d: "Soft desk target for Heavy flights this year." },
+        { k: "Landings", v: "—", d: "Successful Heavy booster recoveries logged this year." },
+        { k: "Pad", v: "39A", d: "LC-39A at Kennedy is Heavy’s primary home." },
       ],
       media: [
         { handle: "@SpaceX", title: "SpaceX", url: "https://x.com/SpaceX" },
@@ -1176,9 +1176,9 @@ window.SPACEHUB_DATA = {
       specs: [
         {
           k: "Height",
-          v: "121 m",
-          s: "full stack",
-          d: "Stacked Super Heavy plus Starship is on the order of 121 meters — far taller than Falcon. That height is the visible statement of the next architecture: full-flow methalox, catch towers, and eventually rapid restack.",
+          v: "124 m",
+          s: "full stack · SpaceX",
+          d: "Stacked Super Heavy plus Starship is about 124 meters on the current SpaceX vehicle page (Block 3 class) — far taller than Falcon. That height is the visible statement of the next architecture: full-flow methalox, catch towers, and rapid restack.",
         },
         {
           k: "Diameter",
@@ -1196,25 +1196,25 @@ window.SPACEHUB_DATA = {
           k: "Engines · boost",
           v: "33× Raptor",
           s: "Super Heavy",
-          d: "About thirty-three Raptors on Super Heavy at liftoff. Count and thrust class still evolve with vehicle generations — the point is a wall of methalox engines instead of nine Merlins.",
+          d: "Thirty-three Raptors on Super Heavy at liftoff (SpaceX). Count and thrust class still evolve with vehicle generations — the point is a wall of methalox engines instead of nine Merlins.",
         },
         {
           k: "Engines · upper",
           v: "6× Raptor",
           s: "3 SL + 3 vac",
-          d: "Ship typically flies a mix of sea-level and vacuum Raptors (often described as three plus three). That mix handles ascent, on-orbit work, and eventual entry and landing burns.",
+          d: "Ship flies three sea-level Raptors and three Raptor Vacuum engines (SpaceX). That mix handles ascent, on-orbit work, and eventual entry and landing burns.",
         },
         {
           k: "Stage 1 thrust",
-          v: "70+ MN",
-          s: "still rising",
-          d: "Booster thrust is in the tens of meganewtons — public class figures sit around 70 MN and keep climbing as Raptors improve. This is why Starship needs a different pad and tower than Falcon.",
+          v: "~81 MN",
+          s: "Super Heavy class",
+          d: "Super Heavy liftoff thrust is about 8,240 tf / ~81 MN on the current SpaceX page (Block 3 / Raptor 3 class) and still climbs with engine generations. This is why Starship needs a different pad and tower than Falcon.",
         },
         {
           k: "Stage 2 thrust",
-          v: "15 MN",
+          v: "~16 MN",
           s: "Ship class",
-          d: "Ship thrust is a smaller but still huge vacuum/sea-level mix — public order-of-magnitude around 15 MN class. Enough to finish ascent and later support landing or deep-space burns as the architecture matures.",
+          d: "Ship thrust is about 1,614 tf / ~16 MN class on the current SpaceX page (sea-level + vacuum mix). Enough to finish ascent and later support landing or deep-space burns as the architecture matures.",
         },
         {
           k: "Fuel / ox",
@@ -1224,15 +1224,15 @@ window.SPACEHUB_DATA = {
         },
         {
           k: "Liftoff mass",
-          v: "5,000 t",
+          v: "5,000+ t",
           s: "fueled stack",
-          d: "A fully fueled stack is on the order of five thousand tonnes — an order of magnitude above Falcon Heavy. That mass is why catch towers, deluge, and pad design dominate the Starbase story.",
+          d: "A fully fueled stack is on the order of five thousand-plus tonnes (propellant alone is thousands of tonnes before dry mass) — an order of magnitude above Falcon Heavy. That mass is why catch towers, deluge, and pad design dominate the Starbase story.",
         },
         {
           k: "Payload LEO",
           v: "100+ t",
           s: "reusable aim",
-          d: "Published reusable LEO ambition is 100+ tonnes class — enough for huge Starlink batches or deep-space stack pieces. Flight test is still proving the path; the number is the goal, not today’s ticket.",
+          d: "Published reusable LEO ambition is 100+ tonnes class — enough for huge Starlink batches or deep-space stack pieces. Early orbital Starlink V3 deployments have begun; the number is still the design goal, not a fixed ticket.",
         },
         {
           k: "Payload GTO",
@@ -1290,22 +1290,22 @@ window.SPACEHUB_DATA = {
         {
           k: "Sites",
           v: "TX · FL",
-          s: "Starbase · 39A path",
+          s: "Starbase · 39A / 37",
           action: "map",
-          d: "Starbase flies now. Florida Starship (LC-39A and SLC-37 path) is the east-coast expansion so national security and high cadence are not stuck on one Texas pad.",
+          d: "Starbase flies now. Florida Starship adds an LC-39A ship pad path plus two planned pads at SLC-37 so national security and high cadence are not stuck on one Texas pad. Starbase Louisiana is the longer-range Gulf expansion.",
         },
         {
           k: "Next",
           v: "Pad 2",
           s: "Starbase",
-          d: "Next flight test is expected from Starbase Pad 2 while OLP-1 is rebuilt. NET dates move with hardware, weather, and licenses — treat soft NETs as guidance, not promises.",
+          d: "Next flight is expected from Starbase Pad 2 while OLP-1 is rebuilt. NET dates move with hardware, weather, and licenses — treat soft NETs as guidance, not promises.",
         },
       ],
       stats: [
-        { k: "Flights YTD", v: "2" },
-        { k: "Year target", v: "12" },
-        { k: "Success", v: "—" },
-        { k: "Catch", v: "Tower" },
+        { k: "Flights YTD", v: "2", d: "Starship integrated flight tests this year." },
+        { k: "Year target", v: "12", d: "Soft desk target for Starship flight tests this year." },
+        { k: "Success", v: "—", d: "Launch Library outcomes for Starship flights this year." },
+        { k: "Catch", v: "Tower", d: "Mechazilla chopsticks at Starbase — the reuse bet unique to Ship." },
       ],
       media: [
         { handle: "@SpaceX", title: "SpaceX", url: "https://x.com/SpaceX" },
@@ -1448,14 +1448,14 @@ window.SPACEHUB_DATA = {
         {
           k: "Destination",
           v: "ISS",
-          s: "station docking",
-          d: "Primary destination is the International Space Station, docking at IDA ports. That link is why Dragon is more than a capsule demo — it is operational logistics and crew transport.",
+          s: "primary · NASA / station",
+          d: "Most NASA crew and cargo Dragons dock at the ISS. Some private crew missions use different profiles — read the next-flight band for the mission on the pad.",
         },
         {
           k: "Pad",
-          v: "39A",
-          s: "Crew / Cargo home",
-          d: "Most Dragon missions stack on Falcon 9 at LC-39A. The same pad that flies Heavy and high-profile F9 work is the usual crew/cargo gateway.",
+          v: "39A / 40",
+          s: "Cape / Kennedy",
+          d: "Dragon stacks on Falcon 9 from LC-39A or SLC-40 at the Cape / Kennedy — whichever pad the live manifest lists for the next mission.",
         },
         {
           k: "Next",
@@ -1465,10 +1465,10 @@ window.SPACEHUB_DATA = {
         },
       ],
       stats: [
-        { k: "Crew YTD", v: "2" },
-        { k: "Cargo YTD", v: "2" },
-        { k: "Total", v: "4" },
-        { k: "Year target", v: "8" },
+        { k: "Crew YTD", v: "2", d: "Crew Dragon missions flown this year." },
+        { k: "Cargo YTD", v: "2", d: "Cargo Dragon missions flown this year." },
+        { k: "Total", v: "4", d: "All Dragon missions this year (crew + cargo)." },
+        { k: "Year target", v: "8", d: "Soft desk target for Dragon flights this year." },
       ],
       media: [
         { handle: "@SpaceX", title: "SpaceX", url: "https://x.com/SpaceX" },
@@ -1545,7 +1545,7 @@ window.SPACEHUB_DATA = {
           k: "V3 path",
           v: "Starship",
           s: "larger sats",
-          d: "Next-gen Starlink (V3 class) wants Starship’s payload bay — larger satellites, fewer launches per capacity. Falcon still builds the mesh today; Ship is the scale-up path.",
+          d: "Starlink V3 needs Starship’s payload bay — larger satellites, fewer launches per capacity. Falcon still flies most of the mesh; Starship has begun orbital V3 deployments while Falcon keeps filling shells.",
         },
         {
           k: "Disposal",
@@ -1555,9 +1555,9 @@ window.SPACEHUB_DATA = {
         },
         {
           k: "Coverage",
-          v: "166 mkts",
-          s: "globally",
-          d: "Near-global coverage where regulators allow service. Ops “Markets” counts licensed countries; this cell is the constellation’s geographic ambition, not the legal map alone.",
+          v: "160+ mkts",
+          s: "available or launched",
+          d: "Countries / territories where Starlink is listed as available or launched on the public availability map. Live desk count updates when the markets proxy is reachable.",
         },
       ],
       next: {
@@ -1596,9 +1596,9 @@ window.SPACEHUB_DATA = {
         },
         {
           k: "Markets",
-          v: "166",
+          v: "160+",
           s: "Starlink live",
-          d: "Countries and territories where Starlink is available or launched on the public availability map. Live count when the desk can fetch that file.",
+          d: "Countries and territories where Starlink is available or launched on the public availability map. Live desk count via the markets proxy when reachable.",
         },
         {
           k: "Cadence",
@@ -1614,10 +1614,10 @@ window.SPACEHUB_DATA = {
         },
       ],
       stats: [
-        { k: "Missions YTD", v: "68" },
-        { k: "Year target", v: "100" },
-        { k: "of fleet", v: "76%" },
-        { k: "Markets", v: "166" },
+        { k: "Missions YTD", v: "68", d: "Starlink launch missions this year." },
+        { k: "Year target", v: "100", d: "Soft desk target for Starlink missions this year." },
+        { k: "of fleet", v: "76%", d: "Share of all SpaceX launches this year that were Starlink." },
+        { k: "Markets", v: "160+", d: "Countries / territories with Starlink available or launched on the public map." },
       ],
       media: [
         { handle: "@Starlink", title: "Starlink", url: "https://x.com/Starlink" },

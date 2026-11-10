@@ -1,14 +1,13 @@
 /**
  * SpaceXplore live data — LL2 via /api/ll2 + Open-Meteo + Starlink availability / sat count.
  * Merges into SPACEHUB_DATA; keeps last desk data if the network fails.
- * LL2 and sat count are proxied (never from the browser). Starlink markets: starlink.com.
+ * LL2, sat count, and Starlink markets are proxied (never from the browser).
  */
 (function (global) {
   "use strict";
 
   const LL2_PROXY = "/api/ll2";
-  const STARLINK_AVAIL =
-    "https://www.starlink.com/public-files/availability.json";
+  const MARKETS_PROXY = "/api/markets";
   const CACHE_MS = 5 * 60 * 1000; /* ~5 min — server coalesces; launch status moves */
   const WX_CACHE_MS = 20 * 60 * 1000;
   const MARKETS_CACHE_MS = 6 * 60 * 60 * 1000; /* 6 h */
@@ -571,15 +570,12 @@
     ) {
       return Promise.resolve(cache.markets);
     }
-    return fetchJson(STARLINK_AVAIL)
+    return fetchJson(MARKETS_PROXY)
       .then(function (d) {
-        const a0 = d.admin0 || {};
-        let live = 0;
-        Object.keys(a0).forEach(function (code) {
-          const st = a0[code] && a0[code].status;
-          if (st === "available" || st === "launched") live++;
-        });
-        cache.markets = live || null;
+        if (!d || !d.ok || d.markets == null) throw new Error("markets fail");
+        const live = Number(d.markets);
+        if (!Number.isFinite(live) || live < 1) throw new Error("markets bad");
+        cache.markets = live;
         cache.marketsAt = Date.now();
         return cache.markets;
       })
@@ -847,6 +843,11 @@
             k: "Markets",
             v: marketsLabel,
             s: "Starlink live",
+            d:
+              markets != null
+                ? marketsLabel +
+                  " countries / territories with Starlink available or launched on the public map (desk count via proxy)."
+                : "Countries and territories with Starlink available or launched on the public availability map.",
           },
         ]);
       } else if (id === "falcon9") {
@@ -974,7 +975,7 @@
           {
             k: "Sites",
             v: "TX · FL",
-            s: "Starbase now · 39A path",
+            s: "Starbase now · 39A / 37",
             action: "map",
           },
           {
@@ -1016,17 +1017,25 @@
           {
             k: "Destination",
             v: "ISS",
-            s: "docks at station",
+            s: "primary · NASA / station",
+            d: "Most NASA crew and cargo Dragons dock at the ISS. Some private crew missions use different profiles — read the next-flight band for the mission on the pad.",
           },
           {
             k: "Pad",
-            v: "39A",
-            s: (prog.next && prog.next.pad) || "LC-39A · Kennedy",
+            v: (function () {
+              const pad = (prog.next && prog.next.pad) || "";
+              if (/SLC-?40/i.test(pad)) return "SLC-40";
+              if (/39A/i.test(pad)) return "39A";
+              return pad ? pad : "39A / 40";
+            })(),
+            s: (prog.next && prog.next.pad) || "LC-39A or SLC-40",
+            d: "Dragon stacks on Falcon 9 from LC-39A or SLC-40 at the Cape / Kennedy — whichever pad the live manifest lists for the next mission.",
           },
           {
             k: "Next",
             v: (prog.next && prog.next.name) || "—",
             s: (prog.next && prog.next.status) || "from manifest",
+            d: "Next Dragon mission name and status from the live manifest. NETs move with NASA, weather, and station traffic.",
           },
         ]);
       } else if (id === "starlink") {
@@ -1039,13 +1048,31 @@
           prog,
           "Coverage",
           marketsLabel + " mkts",
-          "globally"
+          "available or launched"
         );
+        const cov = (prog.specs || []).find(function (x) {
+          return x.k === "Coverage";
+        });
+        if (cov) {
+          cov.d =
+            markets != null
+              ? marketsLabel +
+                " countries / territories where Starlink is listed as available or launched on the public availability map (desk count via proxy)."
+              : "Countries / territories where Starlink is listed as available or launched on the public availability map.";
+        }
         prog.stats = [
           { k: "Missions YTD", v: String(stats.starlink), d: "Starlink launch missions this year." },
           { k: "Year target", v: String(prog.yearGoal || "—"), d: "Soft desk target for Starlink missions this year." },
           { k: "of fleet", v: share, d: "Share of all SpaceX launches this year that were Starlink." },
-          { k: "Markets", v: marketsLabel, d: "Countries / markets where Starlink is listed as available or launched." },
+          {
+            k: "Markets",
+            v: marketsLabel,
+            d:
+              markets != null
+                ? marketsLabel +
+                  " countries / territories with Starlink available or launched on the public map."
+                : "Countries / territories where Starlink is listed as available or launched.",
+          },
         ];
         prog.tiles = withTileDesc(prog, [
           {
@@ -1067,6 +1094,11 @@
             k: "Markets",
             v: marketsLabel,
             s: "Starlink live",
+            d:
+              markets != null
+                ? marketsLabel +
+                  " countries / territories with Starlink available or launched on the public map."
+                : "Countries / territories where Starlink is listed as available or launched.",
           },
           {
             k: "Cadence",

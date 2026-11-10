@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Serve SpaceXplore over HTTPS on all interfaces for multi-device LAN preview.
-Also proxies /api/spcx for live NASDAQ quote (browser CORS blocks finance hosts)."""
+Also proxies /api/spcx (NASDAQ quote) and /api/markets (Starlink availability)."""
 # --- preview-ctl guard v3: begin ---
 # Managed by ~/bin/preview-ctl.py. Three hazards this removes:
 #   1. The launching terminal can go away while the server runs on. Writing an
@@ -360,6 +360,37 @@ def _restore_client_timeout(sock, old):
 STARLINK_COUNT_URL = "https://keeptrack.space/starlink-satellite-count"
 STARLINK_CACHE_MS = 60 * 60 * 1000
 _starlink_mem = {"at": 0, "working": None, "inOrbit": None}
+STARLINK_MARKETS_URL = "https://www.starlink.com/public-files/availability.json"
+_markets_mem = {"at": 0, "markets": None}
+
+
+def fetch_starlink_markets():
+    now = int(time.time() * 1000)
+    if (
+        _markets_mem["at"]
+        and now - _markets_mem["at"] < STARLINK_CACHE_MS
+        and _markets_mem["markets"] is not None
+    ):
+        return _markets_mem
+    req = Request(
+        STARLINK_MARKETS_URL,
+        headers={
+            "User-Agent": "SpaceXplore/1.0 (https://spacexplore.markmaga.com)",
+            "Accept": "application/json",
+        },
+    )
+    with urlopen(req, timeout=20) as res:
+        data = json.loads(res.read().decode("utf-8", "replace"))
+    a0 = (data or {}).get("admin0") or {}
+    live = 0
+    for _code, row in a0.items():
+        st = (row or {}).get("status")
+        if st in ("available", "launched"):
+            live += 1
+    if not live:
+        raise RuntimeError("markets parse failed")
+    _markets_mem.update({"at": now, "markets": live})
+    return _markets_mem
 
 
 def parse_starlink_count(html):
@@ -502,6 +533,44 @@ class Handler(SimpleHTTPRequestHandler):
             finally:
                 _restore_client_timeout(sock, old_to)
             return
+        if path == "/api/markets" or path == "/api/markets/":
+            sock, old_to = _hold_client_open(self, 60)
+            try:
+                b = fetch_starlink_markets()
+                body = json.dumps(
+                    {
+                        "ok": True,
+                        "at": b["at"],
+                        "markets": b["markets"],
+                    }
+                ).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except Exception as err:
+                if _markets_mem["markets"] is not None:
+                    body = json.dumps(
+                        {
+                            "ok": True,
+                            "at": _markets_mem["at"],
+                            "markets": _markets_mem["markets"],
+                            "stale": True,
+                        }
+                    ).encode("utf-8")
+                    self.send_response(200)
+                else:
+                    body = json.dumps({"ok": False, "error": str(err)}).encode("utf-8")
+                    self.send_response(502)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            finally:
+                _restore_client_timeout(sock, old_to)
+            return
         if path == "/api/spcx" or path == "/api/spcx/":
             sock, old_to = _hold_client_open(self, 60)
             try:
@@ -616,6 +685,7 @@ def main():
         print("  Open this URL on the phone, wait for the page, then Share → Add to Home Screen.")
 
     print(f"  Quote:  /api/spcx")
+    print(f"  Markets:/api/markets")
     print(f"  Dir:    {ROOT}")
     try:
         httpd.serve_forever()

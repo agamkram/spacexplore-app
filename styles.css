@@ -464,6 +464,8 @@ html.pwa-standalone .fit-stage {
 .sh-pin-dot {
   display: block;
   border-radius: 50%;
+  transform: scale(var(--pin-scale, 1));
+  transform-origin: center center;
 }
 
 .sh-tip {

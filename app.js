@@ -1037,16 +1037,14 @@
   let borderDataPromise = null;
   const mapsWithBorders = new WeakSet();
 
-  function pinIcon(isNext, large, nextColor) {
+  function pinIcon(isNext, nextColor) {
     const Lref = window.L;
     if (!Lref || !Lref.divIcon) return undefined;
-    /* Hit box = visible dot only (pads are dense) */
-    const dot = large ? (isNext ? 14 : 10) : isNext ? 12 : 8;
+    /* Same size for every site. Next launch is told apart by program color. */
+    const dot = 6;
     const hit = dot;
     const color = isNext ? nextColor || nextPinAccent(null) : "#f2f5fa";
-    const ring = isNext
-      ? "box-shadow:0 0 0 2px rgba(4,6,10,0.95),0 0 12px " + color + ";"
-      : "box-shadow:0 0 0 1px rgba(4,6,10,0.9);";
+    const ring = "box-shadow:0 0 0 1px rgba(4,6,10,0.9);";
     try {
       return Lref.divIcon({
         className: "sh-pin leaflet-div-icon" + (isNext ? " is-next" : ""),
@@ -1301,6 +1299,9 @@
       bounds: worldBounds,
     }).addTo(map);
     if (interactive) wirePopupOpenMaps(map);
+    map.on("zoom zoomend", function () {
+      applyPinScale(map);
+    });
     addWhiteBorders(map);
     /* Full map only: lock min zoom to edge-filling globe (mini uses regional frame) */
     if (interactive) {
@@ -1373,6 +1374,24 @@
     }
   }
 
+  /**
+   * Dot is 3px on the globe and 6px once zoomed in.
+   * Scale is visual only so we don't rebuild markers (that drops taps).
+   */
+  function pinScaleForZoom(z) {
+    if (!Number.isFinite(z)) return 1;
+    const t = Math.max(0, Math.min(1, (z - 2) / 5));
+    return (3 + 3 * t) / 6;
+  }
+
+  function applyPinScale(map) {
+    if (!map || !map.getContainer) return;
+    try {
+      const scale = pinScaleForZoom(map.getZoom());
+      map.getContainer().style.setProperty("--pin-scale", scale.toFixed(3));
+    } catch (_) {}
+  }
+
   function syncSiteMarkers(layerGroup, highlightId, large, interactive, nextColor) {
     const Lref = window.L;
     if (!Lref || !layerGroup) return;
@@ -1401,7 +1420,7 @@
       layerGroup.clearLayers();
       (DATA.sites || []).forEach((s) => {
         const isNext = s.id === highlightId;
-        const icon = pinIcon(isNext, large, pinColor);
+        const icon = pinIcon(isNext, pinColor);
         const opts = {
           interactive: !!interactive,
           keyboard: !!interactive,

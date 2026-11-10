@@ -6,8 +6,8 @@ window.SPACEHUB_DATA = {
   year: 2026,
   fleetGoal: 145,
   fleetYtd: 108,
-  lastUpdated: "2026-09-11T22:00:00Z",
-  sitesRev: 46,
+  lastUpdated: "2026-11-10T22:30:00Z",
+  sitesRev: 62,
 
   /*
    * SpaceXAI / SPCX site atlas — lat/lon from public maps, OSM, Census, city filings.
@@ -20,17 +20,20 @@ window.SPACEHUB_DATA = {
    * Oct 2026 (post-merger): Palo Alto AI, Memphis/Southaven Colossus, Grimes Terafab,
    * Port of Brownsville 444-acre, Woodinville, Sunnyvale, Bloomfield, Canandaigua,
    * Bellevue AI, London AI, Dublin Starlink EU. Gateways / leased colo not pinned.
+   * Nov 2026: Southaven Gun Range / Spam / Stanton power; Cochise AZ campus;
+   * Port / Hwy 4 deed corridor; USFWS Massey swap; Port leases; KSC Roberts expansion;
+   * Gigabay pins; South Padre 54 acres; SLC-37 Pad B. HQ language → Starbase.
    */
   sites: [
     /* ── California ── */
     {
       id: "hawthorne",
-      name: "Headquarters · Hawthorne",
-      kind: "hq",
+      name: "Hawthorne · Falcon / Dragon",
+      kind: "build",
       lat: 33.92036,
       lon: -118.32803,
       blurb:
-        "1 Rocket Road, Hawthorne, CA — original HQ campus; still a core engineering, mission-control, and Falcon/Dragon manufacturing site (corporate HQ later shifted emphasis to Starbase, TX).",
+        "1 Rocket Road, Hawthorne, CA — original campus and still a core Falcon / Dragon engineering, mission-control, and manufacturing site. Official spacex.com/sites now lists Starbase, TX as headquarters.",
     },
     {
       id: "hawthorne-factory",
@@ -237,23 +240,18 @@ window.SPACEHUB_DATA = {
         "Starlink manufacturing hub near Austin (858 FM 1209, Bastrop County) — satellites, user terminals, and electronics.",
     },
     {
-      /*
-       * East of Brownsville landfill along South Connector / port corridor.
-       * Landfill ~25.939, −97.422; Port of Brownsville ~25.951, −97.411.
-       * Tract center is approximate — not a surveyed parcel centroid.
-       */
       id: "brownsville-444",
       name: "Port Brownsville · 444 acres",
-      kind: "build",
+      kind: "compute",
       /*
-       * OSM Brownsville Landfill centroid ~25.936, −97.386 (east edge ~−97.378).
-       * Tract is east of landfill on South Connector — pin just east of that edge.
-       * Still approximate (no surveyed parcel centroid published).
+       * TCEQ “Boca Chica Facility” filing (Sept 8, 2026) lists 25.957265 N, −97.369633 W
+       * at the north end of the tract (Yolanda Del Rio / Hwy 4). Pin is mid-tract
+       * between that filing point and the South Connector / landfill edge.
        */
-      lat: 25.9375,
-      lon: -97.372,
+      lat: 25.948,
+      lon: -97.3705,
       blurb:
-        "~444-acre SpaceX tract along South Connector Road, east of the Brownsville landfill near the Port of Brownsville. Disannexed from Brownsville Aug 2026 (~$220M water deal), annexed by Starbase. Not for launches or rocket testing — port-side industrial / logistics (data-center speculation continues). Pin is approximate, just east of the landfill OSM footprint.",
+        "~444-acre SpaceX tract north of Hwy 4 / Boca Chica Blvd near the Port of Brownsville (disannexed from Brownsville Aug 2026, annexed by Starbase). Sept 8 TCEQ air registration for a “Boca Chica Facility” lists ~748 MW of temporary gas turbines (later ~708 MW permanent) and a computer-processing industry code; Starbase permit log cites a data-center path. Not for launches or rocket testing. Pin is approximate mid-tract.",
     },
     {
       id: "terafab",
@@ -462,6 +460,216 @@ window.SPACEHUB_DATA = {
         "Floor 3, Block 3, Miesian Plaza, Dublin 2 — Starlink’s EU legal / network ops entity (Starlink Internet Services Limited). SpaceXAI / Starlink hiring site for network software and ops.",
     },
 
+    /* ── Mid-South compute additions (Nov 2026) ── */
+    {
+      id: "gun-range",
+      name: "Gun Range · Southaven",
+      kind: "compute",
+      /*
+       * 8325 Tulane Rd — former Southaven police/fire training site.
+       * Coords triangulated from published distances to Spam (0.71 mi) and
+       * Macrohardrr (1.09 mi); campus sits west of the Stanton power plant.
+       */
+      lat: 34.9828,
+      lon: -90.0467,
+      blurb:
+        "8325 Tulane Rd, Southaven, MS — Gun Range, SpaceXAI Colossus 2 training cluster on the former city police/fire training site (~56 acres, two buildings). Announced early Nov 2026; targeting late Nov online. Pin is approximate campus area from published distances to Spam and Macrohardrr.",
+    },
+    {
+      id: "spam",
+      name: "Spam · Southaven",
+      kind: "compute",
+      /* Census address match: 2929 Stateline Rd W */
+      lat: 34.99173,
+      lon: -90.0402,
+      blurb:
+        "2929 Stateline Rd W, Southaven, MS — Spam, SpaceXAI inference cluster in the former Hormel cold-storage warehouse (~53 acres). Announced early Nov 2026; targeting Dec online. SE corner of Tulane / Stateline.",
+    },
+    {
+      id: "stanton-power",
+      name: "Stanton Rd · power plant",
+      kind: "support",
+      /*
+       * 2875 Stanton Rd S — MZX Tech / SpaceXAI gas plant for Colossus 2.
+       * Facility-center pin from public plant listings (address geocode is nearby).
+       */
+      lat: 34.98077,
+      lon: -90.03971,
+      blurb:
+        "2875 Stanton Rd S, Southaven, MS — SpaceXAI gas-turbine plant feeding the Colossus 2 campus (Macroharder / Gun Range / Spam). Permitted permanent units plus temporary turbines; not a data-hall pin.",
+    },
+
+    /* ── Arizona · SpaceXAI (planned) ── */
+    {
+      id: "cochise-az",
+      name: "Cochise · AI campus · planned",
+      kind: "compute",
+      /*
+       * Tombstone Resources (SpaceXAI) SUA: ~747 acres east of US 191 adjoining
+       * AEPCO Apache Generating Station (32.0603, −109.8931). Campus parcels sit
+       * east of the highway/plant — pin just east of the published station coords.
+       */
+      lat: 32.061,
+      lon: -109.881,
+      blurb:
+        "Unincorporated Cochise County, AZ (near Willcox Playa / Hwy 191) — planned SpaceXAI supercomputer campus on ~747 acres adjoining AEPCO’s Apache Generating Station (Tombstone Resources filing). Up to nine buildings / ~6 GW in four phases; Dec 9, 2026 zoning hearing. Pin is approximate campus area east of the station — not a building footprint.",
+    },
+
+    /* ── South Texas deed corridor (Sept–Nov 2026) ── */
+    {
+      id: "port-surface-n",
+      name: "Hwy 48 · surface (~893 acres)",
+      kind: "build",
+      /*
+       * Sept deed Tract III (~893 acres) runs ~4.8 mi north from Hwy 48.
+       * Distinct from the annexed 444-acre Tract II. Approximate tract center.
+       */
+      lat: 25.992,
+      lon: -97.382,
+      blurb:
+        "Sept 2026 surface-rights deed Tract III (~893 acres) north of Hwy 48 east of Brownsville — part of the ~1,500-acre Port corridor purchase (sellers kept minerals / water). Outside the annexed 444-acre site. Use not announced. Pin is approximate tract center.",
+    },
+    {
+      id: "port-surface-s",
+      name: "Hwy 4 S · surface (~157 acres)",
+      kind: "build",
+      /*
+       * Sept deed Tract I (~157 acres) from Hwy 4 south to the Rio Grande,
+       * beside the 444-acre block. Approximate.
+       */
+      lat: 25.935,
+      lon: -97.375,
+      blurb:
+        "Sept 2026 surface-rights deed Tract I (~157 acres) south of Hwy 4 / Boca Chica Blvd to the Rio Grande — part of the ~1,500-acre Port corridor purchase. Local reporting has floated vendor industrial-park use; SpaceX has not confirmed. Pin is approximate.",
+    },
+    {
+      id: "hwy4-79",
+      name: "Hwy 4 · ~79-acre strip",
+      kind: "build",
+      /*
+       * Oct 22, 2026 deed (~79 acres): ~3.1 mi strip from ship channel across
+       * Hwy 4 to the Rio Grande, ~10.5 mi west of Pad 2. Pin at Hwy 4 crossing.
+       */
+      lat: 25.9548,
+      lon: -97.327,
+      blurb:
+        "~79-acre SpaceX strip (Oct 2026 deed) running ~3.1 miles from the Brownsville Ship Channel south across Hwy 4 to the Rio Grande — about 10.5 miles west of the Starbase pads. Use not announced. Pin is the approximate Hwy 4 crossing.",
+    },
+    {
+      id: "hwy4-390",
+      name: "Hwy 4 · ~390 acres",
+      kind: "build",
+      /*
+       * Nov 4, 2026 deeds: ~245 acres south of Hwy 4 to the Rio Grande and
+       * ~144 acres north to the ship channel, meeting Hwy 4 ~11 mi west of Pad 2
+       * (just west of the 79-acre strip). Pin at Hwy 4 between the pair.
+       */
+      lat: 25.9548,
+      lon: -97.335,
+      blurb:
+        "Nov 4, 2026 deeds totaling ~390 acres facing each other across Hwy 4 (~11 miles west of the Starbase pads): ~245 acres south to the Rio Grande and ~144 acres north to the ship channel, just west of the 79-acre strip. Use not announced. Pin is approximate Hwy 4 mid-point of the pair.",
+    },
+    {
+      id: "massey-swap",
+      name: "Massey's · refuge swap",
+      kind: "test",
+      /*
+       * USFWS land exchange: SpaceX receives ~715 acres of LRGV NWR land east of
+       * Massey’s for test-site expansion + service road (SpaceX deeds ~683 acres out).
+       * Pin east of existing Massey’s / Massey 2 footprints.
+       */
+      lat: 25.9525,
+      lon: -97.238,
+      blurb:
+        "USFWS Boca Chica land exchange (closed Sept 2026): SpaceX receives ~715 acres of Lower Rio Grande Valley National Wildlife Refuge land east of Massey’s for test-site expansion and a service road toward Hwy 4 (SpaceX deeded ~683 acres elsewhere into the refuge). Pin is approximate eastward expansion area — not a surveyed parcel centroid.",
+    },
+    {
+      id: "port-lease-81",
+      name: "Port Brownsville · 81-acre lease",
+      kind: "support",
+      /* Port of Brownsville Business Park — OSM port campus area */
+      lat: 25.951,
+      lon: -97.4113,
+      blurb:
+        "Short-term SpaceX lease of ~81 acres in the Port of Brownsville Business Park (approved with the port’s pipeline / dirt / dock MOU package). Relocatable if the port needs the pad for a permanent tenant. Distinct from the owned 444-acre tract.",
+    },
+    {
+      id: "port-dock-83",
+      name: "Port Brownsville · dock · planned",
+      kind: "support",
+      /*
+       * Proposed ~83-acre / 50-year dock lease on the south side of the ship channel
+       * for Starship barge traffic to Florida. Still negotiating as of Apr–2026 reporting.
+       */
+      lat: 25.96,
+      lon: -97.39,
+      blurb:
+        "Proposed ~83-acre, 50-year Port of Brownsville dock / assembly lease on the south side of the ship channel — barge path for Starship / Super Heavy components toward Kennedy. Reported as under negotiation; not a closed pad. Pin is approximate channel-south industrial area.",
+    },
+    {
+      id: "south-padre-54",
+      name: "South Padre · 54 acres",
+      kind: "support",
+      /*
+       * Dec 2024 tax-sale buy on the far north island past where SH 100 ends.
+       * Andy Bowie Park ~26.1425, −97.1703; undeveloped north shore is farther north.
+       */
+      lat: 26.185,
+      lon: -97.175,
+      blurb:
+        "~54 acres on the far north end of South Padre Island (Dec 2024 tax-sale deed). Empty land; not part of the USFWS swap. Use not announced — likely buffer / mitigation / holdings. Pin is approximate north-island area past the public road end.",
+    },
+
+    /* ── Florida additions ── */
+    {
+      id: "gigabay-roberts",
+      name: "Gigabay · Roberts Rd",
+      kind: "build",
+      /* North of Hangar X on the Roberts Road Starship campus */
+      lat: 28.549,
+      lon: -80.666,
+      blurb:
+        "Starship Gigabay at Kennedy’s Roberts Road campus — large multi-cell integration / refurb building north of Hangar X. Structure rising through 2026 ahead of Florida Starship flights. Distinct from the Starbase Gigabay.",
+    },
+    {
+      id: "roberts-expand",
+      name: "Roberts Rd · ~400-acre plan",
+      kind: "build",
+      /*
+       * Oct 13, 2026 draft PEA: ~400-acre phased footprint inside a larger study area,
+       * including a ship static-fire stand near the west end of Schwartz Road.
+       */
+      lat: 28.552,
+      lon: -80.678,
+      blurb:
+        "Proposed ~400-acre expansion of the Roberts Road Starship campus at KSC (NASA draft PEA, Oct 13, 2026): ship static-fire / Project Ignition path, payload processing, and a connector road to NASA Parkway. Proposal only — not yet leased/built. Pin is approximate Schwartz Road west-end study area.",
+    },
+    {
+      id: "slc37b",
+      name: "SLC-37 · Pad B · planned",
+      kind: "launch",
+      /*
+       * Official sites page: two Starship orbital pads at SLC-37. Existing slc37 pin
+       * marks the complex; Pad B is a second hardstand in the former Delta IV area.
+       */
+      lat: 28.5305,
+      lon: -80.5648,
+      blurb:
+        "Second planned Starship orbital pad at Space Launch Complex 37, CCSFS (SpaceX sites page lists two pads here). Demolition / site prep of the former Delta IV complex is underway. Pin is approximate Pad B hardstand area beside the main SLC-37 pin.",
+    },
+
+    /* ── Starbase Gigabay ── */
+    {
+      id: "gigabay-starbase",
+      name: "Gigabay · Starbase",
+      kind: "build",
+      /* On the production strip east/northeast of the main factory pin */
+      lat: 25.9905,
+      lon: -97.183,
+      blurb:
+        "Starbase Gigabay — large Starship / Super Heavy integration and refurb building on the Boca Chica production strip (sister to the Roberts Road Gigabay). Build-out continuing through 2026. Pin is approximate high-bay campus area beside the main production pin.",
+    },
+
     /*
      * ── Mission recovery / tracking (not Starlink gateways) ──
      * SpaceX does not publish a dense global TTC estate like NASA DSN.
@@ -520,7 +728,7 @@ window.SPACEHUB_DATA = {
           k: "Starbase",
           v: "Boca Chica",
           s: "Starship",
-          d: "Starbase is the center of gravity for Starship: production, stack, Pad 2 (OLP-2), tower catch path, and heavy engineering presence. OLP-1 is being rebuilt for the next vehicle generation. Boca Chica is where the company is betting the long game — multi-planet transport — while Falcon still flies the daily cadence from Florida and California. Legal / historic HQ campus remains Hawthorne (Rocket Road); Starbase is the operational heart of Starship.",
+          d: "Starbase is company headquarters and the center of gravity for Starship: production, stack, Pad 2 (OLP-2), tower catch path, and heavy engineering presence. OLP-1 is being rebuilt for the next vehicle generation. Boca Chica is where the company is betting the long game — multi-planet transport — while Falcon still flies the daily cadence from Florida and California. Hawthorne remains the Falcon / Dragon factory campus.",
         },
         {
           k: "Launch pads",
@@ -560,9 +768,9 @@ window.SPACEHUB_DATA = {
         },
         {
           k: "HQ",
-          v: "Hawthorne",
-          s: "1 Rocket Road",
-          d: "SpaceX’s original headquarters campus at 1 Rocket Road, Hawthorne. Still a core engineering, mission-control, and manufacturing site for Falcon and Dragon — stages, engines, and spacecraft build-up — even as Starbase grew into the Starship and corporate center of gravity. Large share of company headcount and day-to-day vehicle work still runs through Rocket Road.",
+          v: "Starbase",
+          s: "Boca Chica · TX",
+          d: "Official company headquarters is Starbase, Texas (Boca Chica) per spacex.com/sites — Starship development, manufacturing, test, and launch. Hawthorne (1 Rocket Road) remains a core Falcon / Dragon engineering and manufacturing campus, not the corporate HQ label.",
         },
         {
           k: "SPCX price",

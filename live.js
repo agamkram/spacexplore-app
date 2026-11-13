@@ -37,7 +37,8 @@
     return y + "-01-01T00:00:00Z";
   }
 
-  function fetchJson(url) {
+  function fetchJson(url, opts) {
+    opts = opts || {};
     const ctrl =
       typeof AbortController !== "undefined" ? new AbortController() : null;
     const timer =
@@ -47,10 +48,12 @@
           ctrl.abort();
         } catch (_) {}
       }, 20000);
-    return fetch(url, {
+    const req = {
       headers: { Accept: "application/json" },
       signal: ctrl ? ctrl.signal : undefined,
-    })
+    };
+    if (opts.cache) req.cache = opts.cache;
+    return fetch(url, req)
       .then(function (res) {
         if (timer) clearTimeout(timer);
         if (!res.ok) throw new Error("HTTP " + res.status + " " + url);
@@ -596,25 +599,33 @@
       });
   }
 
-  function loadLl2() {
-    if (cache.at && Date.now() - cache.at < CACHE_MS && cache.upcoming.length) {
+  function loadLl2(opts) {
+    opts = opts || {};
+    const maxAge = opts.fresh
+      ? 0
+      : opts.maxAge != null
+        ? opts.maxAge
+        : CACHE_MS;
+    if (cache.at && Date.now() - cache.at < maxAge && cache.upcoming.length) {
       return attachMarkets(cache);
     }
-    return fetchJson(LL2_PROXY).then(function (d) {
-      if (!d || !d.ok) throw new Error("ll2 proxy failed");
-      const prevOk = !!d.previousOk;
-      const lastPrev = cache.previous || [];
-      cache = {
-        at: d.at || Date.now(),
-        upcoming: d.upcoming || [],
-        previous: prevOk ? d.previous || [] : lastPrev,
-        previousOk: prevOk || lastPrev.length > 0,
-        agency: d.agency != null ? d.agency : cache.agency || null,
-        markets: cache.markets,
-        marketsAt: cache.marketsAt,
-      };
-      return attachMarkets(cache);
-    });
+    return fetchJson(LL2_PROXY, opts.fresh ? { cache: "no-store" } : {}).then(
+      function (d) {
+        if (!d || !d.ok) throw new Error("ll2 proxy failed");
+        const prevOk = !!d.previousOk;
+        const lastPrev = cache.previous || [];
+        cache = {
+          at: d.at || Date.now(),
+          upcoming: d.upcoming || [],
+          previous: prevOk ? d.previous || [] : lastPrev,
+          previousOk: prevOk || lastPrev.length > 0,
+          agency: d.agency != null ? d.agency : cache.agency || null,
+          markets: cache.markets,
+          marketsAt: cache.marketsAt,
+        };
+        return attachMarkets(cache);
+      }
+    );
   }
 
   function applyLiveToData(base, live) {
@@ -649,11 +660,9 @@
       if (up.length) {
         /*
          * Prefer first non-terminal (Go / Hold / In flight / TBC).
-         * LL2 often still lists a just-landed Success first — that made the
-         * desk stick on e.g. Starlink 10-19 while 17-49 was the real next.
-         * Exception: a Success / Fail from the last few hours IS the current
-         * mission (Crew-13 launch day). Keep it so the band can say Last /
-         * In flight, and put the real next in nextUp.
+         * LL2 often still lists a just-landed Success first — skip it and
+         * promote the next open launch. Keep only an active In flight as
+         * the head so the band can say In flight; real next goes in nextUp.
          */
         const first = up[0];
         const open = up.filter(function (L) {
@@ -663,15 +672,15 @@
           (first && first.status && first.status.name) ||
           ""
         ).toLowerCase();
-        const firstNet = first && first.net ? new Date(first.net).getTime() : NaN;
+        const firstNet =
+          first && first.net ? new Date(first.net).getTime() : NaN;
         const firstAge = Number.isFinite(firstNet)
           ? Date.now() - firstNet
           : Infinity;
         const keepFirst =
-          /in\s*flight/.test(firstStatus) ||
-          (isTerminalLaunch(first) &&
-            firstAge >= 0 &&
-            firstAge < 6 * 3600 * 1000);
+          /in\s*flight/.test(firstStatus) &&
+          firstAge >= 0 &&
+          firstAge < 3 * 3600 * 1000;
 
         let head;
         let trail;
@@ -1346,7 +1355,10 @@
     const onLl2 = typeof opts.onLl2 === "function" ? opts.onLl2 : null;
 
     /* Quote and LL2 are independent — paint each as soon as it lands */
-    const ll2P = loadLl2()
+    const ll2P = loadLl2({
+      fresh: !!opts.fresh,
+      maxAge: opts.maxAge,
+    })
       .then(function (live) {
         applyLiveToData(base, live);
         base.live = true;

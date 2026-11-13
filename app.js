@@ -164,6 +164,69 @@
     return { main, sub: "" };
   }
 
+  /**
+   * Baked data.js next is often already flown. Don't paint it as Next
+   * (or Last of a months-old seed) while /api/ll2 is still in flight.
+   */
+  function seedLaunchIsLive(n) {
+    if (!n || !n.name || n.name === "—") return false;
+    const st = (n.status || "").toLowerCase();
+    if (/success|fail|partial/.test(st)) return false;
+    const net = n.net ? new Date(n.net).getTime() : NaN;
+    if (!Number.isFinite(net)) return true;
+    const pastMs = Date.now() - net;
+    if (pastMs <= 90 * 1000) return true;
+    const prec = (n.precision || "").toLowerCase();
+    if (prec === "month" || prec === "quarter" || prec === "year") {
+      const d = new Date(net);
+      const end = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
+      return Date.now() < end;
+    }
+    if (/in\s*flight/.test(st)) return pastMs <= 3 * 3600 * 1000;
+    if (/go|hold/.test(st)) return pastMs <= 3 * 3600 * 1000;
+    if (/tbc|tbd/.test(st)) {
+      if (prec === "day") return pastMs <= 24 * 3600 * 1000;
+      return pastMs <= 6 * 3600 * 1000;
+    }
+    return pastMs <= 3 * 3600 * 1000;
+  }
+
+  function waitingNext(programId) {
+    return {
+      name: "—",
+      rocket: "",
+      pad: "—",
+      siteId: null,
+      programId: programId === "machine" ? null : programId,
+      net: null,
+      windowEnd: null,
+      windowStart: null,
+      precision: "month",
+      status: "",
+      statusNote: "",
+      webcast: "",
+      missionType: "",
+    };
+  }
+
+  function scrubStaleSeedOps() {
+    ORDER.forEach((id) => {
+      const prog = DATA.programs[id];
+      if (!prog) return;
+      if (seedLaunchIsLive(prog.next)) {
+        if (prog.nextUp && !seedLaunchIsLive(prog.nextUp)) prog.nextUp = null;
+        return;
+      }
+      if (seedLaunchIsLive(prog.nextUp)) {
+        prog.next = prog.nextUp;
+        prog.nextUp = null;
+        return;
+      }
+      prog.next = waitingNext(id);
+      prog.nextUp = null;
+    });
+  }
+
   function statusClass(status) {
     const s = (status || "").toLowerCase();
     if (s.includes("in flight")) return "is-flight";
@@ -1959,8 +2022,13 @@
       return Promise.resolve({ ok: false, busy: true });
     }
     liveRefreshing = true;
+    const fresh =
+      reason === "visible" ||
+      reason === "queued" ||
+      (reason === "interval" && isNearLaunch());
     /* Quote and LL2 each paint when ready — neither waits on the other */
     return Live.refresh({
+      fresh: fresh,
       onQuote: function () {
         try {
           paintLiveDesk();
@@ -2019,6 +2087,10 @@
       }
     } catch (_) {}
     return 5 * 60 * 1000;
+  }
+
+  function isNearLaunch() {
+    return nearLaunchRefreshMs() <= 90 * 1000;
   }
 
   function scheduleLiveRefresh() {
@@ -2081,6 +2153,7 @@
     });
 
     buildPicker();
+    scrubStaleSeedOps();
     renderProgram(activeId);
     initFit();
     tickTimer = window.setInterval(tickCountdown, 1000);

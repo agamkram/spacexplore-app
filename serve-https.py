@@ -91,7 +91,6 @@ if _pc_ss.StreamRequestHandler.timeout is None:
 # --- preview-ctl guard v3: end ---
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
-from urllib.request import Request, urlopen
 import json
 import re
 import ssl
@@ -117,6 +116,8 @@ SPCX_SHARES = 13_090_854_846
 
 
 def _http_json(url):
+    from urllib.request import Request, urlopen
+
     req = Request(
         url,
         headers={
@@ -250,7 +251,9 @@ def _ll2_save_disk():
 _ll2_load_disk()
 
 
-def _ll2_json(url, timeout=45):
+def _ll2_json(url, timeout=12):
+    from urllib.request import Request, urlopen
+
     req = Request(
         url,
         headers={
@@ -274,54 +277,46 @@ def _ll2_paged(url, max_pages=4):
     return acc
 
 
-def fetch_ll2_bundle():
+_ll2_refreshing = False
+
+
+def _ll2_load_from_network():
     import datetime
-    import time
     from urllib.parse import quote
 
+    y0 = "%d-01-01T00:00:00Z" % datetime.datetime.utcnow().year
     now = int(time.time() * 1000)
-    with _ll2_lock:
-        if (
-            _ll2_mem["at"]
-            and now - _ll2_mem["at"] < LL2_CACHE_MS
-            and _ll2_mem["upcoming"]
-        ):
-            return dict(_ll2_mem)
-        y0 = "%d-01-01T00:00:00Z" % datetime.datetime.utcnow().year
-        try:
-            up = _ll2_json(
-                LL2
-                + "/launch/upcoming/?lsp__id=121&limit=20&mode=detailed&ordering=net"
-            )
-            upcoming = up.get("results") or []
-        except Exception as err:
-            sys.stderr.write("ll2 upcoming failed: %s\n" % err)
-            if _ll2_mem["upcoming"]:
-                stale = dict(_ll2_mem)
-                stale["stale"] = True
-                return stale
-            raise
-        previous = _ll2_mem["previous"] or []
-        previous_ok = False
-        try:
-            qprev = (
-                LL2
-                + "/launch/previous/?lsp__id=121&net__gte="
-                + quote(y0)
-                + "&limit=50&mode=detailed&ordering=-net"
-            )
-            previous = _ll2_paged(qprev, 3)
-            previous_ok = True
-        except Exception as err:
-            sys.stderr.write("ll2 previous failed: %s\n" % err)
+    up = _ll2_json(
+        LL2
+        + "/launch/upcoming/?lsp__id=121&limit=20&mode=detailed&ordering=net"
+    )
+    upcoming = up.get("results") or []
+    if not upcoming:
+        raise RuntimeError("ll2 upcoming empty")
+    previous = []
+    previous_ok = False
+    try:
+        qprev = (
+            LL2
+            + "/launch/previous/?lsp__id=121&net__gte="
+            + quote(y0)
+            + "&limit=50&mode=detailed&ordering=-net"
+        )
+        previous = _ll2_paged(qprev, 3)
+        previous_ok = True
+    except Exception as err:
+        sys.stderr.write("ll2 previous failed: %s\n" % err)
+        with _ll2_lock:
             previous_ok = bool(_ll2_mem["previousOk"] and _ll2_mem["previous"])
             previous = _ll2_mem["previous"] or []
-        agency = _ll2_mem["agency"]
-        try:
-            agency = _ll2_json(LL2 + "/agencies/121/")
-        except Exception as err:
-            sys.stderr.write("ll2 agency failed: %s\n" % err)
+    agency = None
+    try:
+        agency = _ll2_json(LL2 + "/agencies/121/")
+    except Exception as err:
+        sys.stderr.write("ll2 agency failed: %s\n" % err)
+        with _ll2_lock:
             agency = _ll2_mem["agency"]
+    with _ll2_lock:
         _ll2_mem.update(
             {
                 "at": now,
@@ -333,6 +328,56 @@ def fetch_ll2_bundle():
         )
         _ll2_save_disk()
         return dict(_ll2_mem)
+
+
+def _ll2_refresh_worker():
+    global _ll2_refreshing
+    try:
+        _ll2_load_from_network()
+    except Exception as err:
+        sys.stderr.write("ll2 refresh failed: %s\n" % err)
+    finally:
+        with _ll2_lock:
+            _ll2_refreshing = False
+
+
+def fetch_ll2_bundle():
+    """Return cached launches immediately; refresh in the background when stale.
+
+    A blocking upstream fetch here used to outlive the browser's 20s abort,
+    so the desk opened on dashes after seed was cleared.
+    """
+    global _ll2_refreshing
+    now = int(time.time() * 1000)
+    with _ll2_lock:
+        have = bool(_ll2_mem.get("upcoming"))
+        fresh = bool(
+            have and _ll2_mem["at"] and now - _ll2_mem["at"] < LL2_CACHE_MS
+        )
+        if fresh:
+            return dict(_ll2_mem)
+        snapshot = dict(_ll2_mem) if have else None
+        start = False
+        if not _ll2_refreshing:
+            _ll2_refreshing = True
+            start = True
+    if snapshot:
+        if start:
+            threading.Thread(target=_ll2_refresh_worker, daemon=True).start()
+        snapshot["stale"] = True
+        return snapshot
+    if start:
+        try:
+            return _ll2_load_from_network()
+        finally:
+            with _ll2_lock:
+                _ll2_refreshing = False
+    for _ in range(48):
+        time.sleep(0.25)
+        with _ll2_lock:
+            if _ll2_mem.get("upcoming"):
+                return dict(_ll2_mem)
+    raise RuntimeError("ll2 still loading")
 
 
 def _hold_client_open(handler, seconds=120):
@@ -365,6 +410,8 @@ _markets_mem = {"at": 0, "markets": None}
 
 
 def fetch_starlink_markets():
+    from urllib.request import Request, urlopen
+
     now = int(time.time() * 1000)
     if (
         _markets_mem["at"]
@@ -412,6 +459,8 @@ def parse_starlink_count(html):
 
 
 def fetch_starlink_count():
+    from urllib.request import Request, urlopen
+
     now = int(time.time() * 1000)
     if (
         _starlink_mem["at"]

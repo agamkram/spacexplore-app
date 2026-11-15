@@ -47,7 +47,7 @@
         try {
           ctrl.abort();
         } catch (_) {}
-      }, 20000);
+      }, opts.timeoutMs || 20000);
     const req = {
       headers: { Accept: "application/json" },
       signal: ctrl ? ctrl.signal : undefined,
@@ -609,7 +609,10 @@
     if (cache.at && Date.now() - cache.at < maxAge && cache.upcoming.length) {
       return attachMarkets(cache);
     }
-    return fetchJson(LL2_PROXY, opts.fresh ? { cache: "no-store" } : {}).then(
+    return fetchJson(LL2_PROXY, {
+      cache: opts.fresh ? "no-store" : undefined,
+      timeoutMs: 45000,
+    }).then(
       function (d) {
         if (!d || !d.ok) throw new Error("ll2 proxy failed");
         const prevOk = !!d.previousOk;

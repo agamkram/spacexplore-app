@@ -18,22 +18,37 @@ function yearStartIso() {
   return new Date().getUTCFullYear() + "-01-01T00:00:00Z";
 }
 
-async function getJson(url) {
-  const res = await fetch(url, {
-    headers: {
-      Accept: "application/json",
-      "User-Agent": "SpaceXplore/1.0 (https://spacexplore.markmaga.com)",
-    },
-  });
-  if (!res.ok) throw new Error("HTTP " + res.status + " " + url);
-  return res.json();
+async function getJson(url, ms) {
+  ms = ms || 8000;
+  const ctrl = new AbortController();
+  const timer = setTimeout(function () {
+    try {
+      ctrl.abort();
+    } catch (_) {}
+  }, ms);
+  try {
+    const res = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "SpaceXplore/1.0 (https://spacexplore.markmaga.com)",
+      },
+      signal: ctrl.signal,
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status + " " + url);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
-async function fetchPaged(url, maxPages) {
+async function fetchPaged(url, maxPages, budgetMs) {
+  const start = Date.now();
   let acc = [];
   let next = url;
   for (let i = 0; i < maxPages && next; i++) {
-    const data = await getJson(next);
+    const left = budgetMs - (Date.now() - start);
+    if (left < 500) break;
+    const data = await getJson(next, Math.min(8000, left));
     acc = acc.concat(data.results || []);
     next = data.next || null;
   }
@@ -56,25 +71,28 @@ async function loadFresh() {
     "&limit=50&mode=detailed&ordering=-net";
   const qAgency = LL2 + "/agencies/" + LSP + "/";
 
-  const up = await getJson(qUpcoming);
-  const upcoming = up.results || [];
+  /* Upcoming is the desk. Previous/agency can fail without blanking Next. */
+  const upP = getJson(qUpcoming, 8000);
+  const prevP = fetchPaged(qPrevious, 3, 7000).catch(function () {
+    return null;
+  });
+  const agP = getJson(qAgency, 5000).catch(function () {
+    return mem.agency || null;
+  });
+
+  const up = await upP;
+  const upcoming = (up && up.results) || [];
+  if (!upcoming.length) throw new Error("ll2 upcoming empty");
 
   let previous = mem.previous || [];
-  let previousOk = false;
-  try {
-    previous = await fetchPaged(qPrevious, 3);
+  let previousOk = !!(mem.previousOk && previous.length);
+  const prev = await prevP;
+  if (prev && prev.length) {
+    previous = prev;
     previousOk = true;
-  } catch (_) {
-    previousOk = !!(mem.previousOk && mem.previous && mem.previous.length);
-    previous = previousOk ? mem.previous : [];
   }
 
-  let agency = mem.agency;
-  try {
-    agency = await getJson(qAgency);
-  } catch (_) {
-    agency = mem.agency || null;
-  }
+  const agency = await agP;
 
   mem = {
     at: Date.now(),
@@ -90,7 +108,12 @@ async function getBundle() {
   if (mem.at && Date.now() - mem.at < CACHE_MS && mem.upcoming && mem.upcoming.length) {
     return mem;
   }
-  return loadFresh();
+  try {
+    return await loadFresh();
+  } catch (err) {
+    if (mem.upcoming && mem.upcoming.length) return mem;
+    throw err;
+  }
 }
 
 module.exports = async function handler(req, res) {

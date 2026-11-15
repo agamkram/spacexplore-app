@@ -193,7 +193,7 @@
 
   function waitingNext(programId) {
     return {
-      name: "—",
+      name: "Loading next flight",
       rocket: "",
       pad: "—",
       siteId: null,
